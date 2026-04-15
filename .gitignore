@@ -1,0 +1,35 @@
+# ── Python / Backend ──────────────────────────────────────────
+backend/venv/
+backend/__pycache__/
+backend/**/__pycache__/
+backend/**/*.pyc
+backend/**/*.pyo
+backend/.env
+backend/Mepstra_leave.db
+backend/*.db
+backend/uploads/*
+!backend/uploads/.gitkeep
+backend/.pytest_cache/
+backend/tests/__pycache__/
+backend/alembic/__pycache__/
+*.egg-info/
+dist/
+build/
+.eggs/
+*.log
+
+# ── Node / Frontend ───────────────────────────────────────────
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+frontend/.env.local
+frontend/.env.*.local
+frontend/coverage/
+
+# ── OS & Editor ───────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.vscode/settings.json
+.idea/
+*.swp
+*.swo

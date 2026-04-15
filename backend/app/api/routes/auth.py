@@ -1,0 +1,181 @@
+from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordRequestForm
+from sqlalchemy.orm import Session
+from app.db.database import get_db
+from app.schemas.schemas import Token, LoginRequest, UserCreate, UserResponse, OTPSendRequest, OTPVerifyRequest
+from app.models.models import User, UserRole, AllowedEmail
+from app.models.models import Department
+from app.core.security import verify_password, get_password_hash, create_access_token
+from app.services.leave_service import get_or_create_balance
+from app.services.email_service import send_otp_email
+from datetime import date, datetime, timedelta
+import secrets
+import logging
+from sqlalchemy import or_
+
+logger = logging.getLogger(__name__)
+router = APIRouter(prefix="/auth", tags=["Authentication"])
+
+# ─── In-memory OTP store: email -> {"otp": str, "expires": datetime, "verified": bool}
+_otp_store: dict = {}
+
+OTP_EXPIRY_MINUTES = 10
+
+
+def _generate_otp() -> str:
+    return str(secrets.randbelow(900000) + 100000)  # 6-digit OTP
+
+
+def _email_candidates(email: str) -> list[str]:
+    normalized = email.lower().strip()
+    candidates = [normalized]
+
+    if normalized.endswith("@mepstra.com"):
+        candidates.append(normalized.replace("@mepstra.com", "@mepsrta.com"))
+    elif normalized.endswith("@mepsrta.com"):
+        candidates.append(normalized.replace("@mepsrta.com", "@mepstra.com"))
+
+    # Preserve order while removing duplicates.
+    return list(dict.fromkeys(candidates))
+
+
+def authenticate_user(email: str, password: str, db: Session):
+    candidates = _email_candidates(email)
+    user = db.query(User).filter(or_(*(User.email == candidate for candidate in candidates))).first()
+    if not user or not verify_password(password, user.hashed_password):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or PIN")
+    if not user.is_active:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account is deactivated")
+    return user
+
+
+@router.post("/login", response_model=Token)
+def login(data: LoginRequest, db: Session = Depends(get_db)):
+    user = authenticate_user(data.email, data.password, db)
+    token = create_access_token({"sub": str(user.id), "role": user.role})
+    return Token(access_token=token, token_type="bearer", user=user)
+
+
+@router.post("/token", response_model=Token, include_in_schema=False)
+def login_swagger(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    """OAuth2 form login — used by Swagger UI Authorize button."""
+    user = authenticate_user(form.username, form.password, db)
+    token = create_access_token({"sub": str(user.id), "role": user.role})
+    return Token(access_token=token, token_type="bearer", user=user)
+
+
+@router.post("/send-otp", status_code=200)
+def send_otp(data: OTPSendRequest, db: Session = Depends(get_db)):
+    """Send a 6-digit OTP to the given email for registration verification."""
+    email = data.email.strip().lower()
+    if db.query(User).filter(User.email == email).first():
+        raise HTTPException(status_code=400, detail="Email already registered")
+
+    otp = _generate_otp()
+    _otp_store[email] = {
+        "otp": otp,
+        "expires": datetime.utcnow() + timedelta(minutes=OTP_EXPIRY_MINUTES),
+        "verified": False,
+    }
+
+    # Send via email (falls back gracefully if SMTP not configured)
+    try:
+        send_otp_email(email, otp)
+    except Exception as e:
+        logger.warning("OTP email failed: %s", e)
+
+    # Always log OTP to console for development convenience
+    logger.info("OTP for %s: %s", email, otp)
+    print(f"\n>>> OTP for {email}: {otp} (valid {OTP_EXPIRY_MINUTES} min) <<<\n")
+
+    return {"message": "OTP sent to your email address", "expires_in_minutes": OTP_EXPIRY_MINUTES}
+
+
+@router.post("/verify-otp", status_code=200)
+def verify_otp(data: OTPVerifyRequest):
+    """Verify OTP before completing registration."""
+    email = data.email.strip().lower()
+    record = _otp_store.get(email)
+    if not record:
+        raise HTTPException(status_code=400, detail="No OTP found for this email. Please request a new one.")
+    if datetime.utcnow() > record["expires"]:
+        del _otp_store[email]
+        raise HTTPException(status_code=400, detail="OTP has expired. Please request a new one.")
+    if record["otp"] != data.otp.strip():
+        raise HTTPException(status_code=400, detail="Invalid OTP. Please try again.")
+
+    # Mark as verified
+    _otp_store[email]["verified"] = True
+    return {"message": "OTP verified successfully. You may now complete registration."}
+
+
+@router.post("/register", response_model=UserResponse, status_code=201)
+def register(data: UserCreate, db: Session = Depends(get_db)):
+    email = data.email.strip().lower()
+
+    # Check OTP verification (required when OTP was requested)
+    otp_record = _otp_store.get(email)
+    if otp_record:
+        if not otp_record.get("verified"):
+            raise HTTPException(status_code=400, detail="Email OTP not verified. Please verify your OTP first.")
+        if datetime.utcnow() > otp_record["expires"]:
+            del _otp_store[email]
+            raise HTTPException(status_code=400, detail="OTP session expired. Please request a new OTP.")
+
+    # Check against allowed email whitelist (if the list is non-empty, only those emails may register)
+    allowed_count = db.query(AllowedEmail).count()
+    if allowed_count > 0:
+        allowed = db.query(AllowedEmail).filter(AllowedEmail.email == email).first()
+        if not allowed:
+            raise HTTPException(
+                status_code=400,
+                detail="Your email is not in the approved registration list. Please contact the administrator."
+            )
+
+    if db.query(User).filter(User.email == email).first():
+        raise HTTPException(status_code=400, detail="Email already registered")
+
+    department = None
+    if data.department_id:
+        department = db.query(Department).filter(Department.id == data.department_id).first()
+        if not department:
+            raise HTTPException(status_code=400, detail="Selected department does not exist")
+        if data.business_unit and department.business_unit != data.business_unit:
+            raise HTTPException(status_code=400, detail="Selected department does not belong to the chosen business unit")
+
+    # If registering as manager, assign Admin as reporting manager by default.
+    assigned_manager_id = data.manager_id
+    if data.role == UserRole.MANAGER:
+        admin_user = db.query(User).filter(User.role == UserRole.ADMIN, User.is_active == True).first()
+        if not admin_user:
+            raise HTTPException(status_code=400, detail="No active admin user available for manager assignment")
+        assigned_manager_id = admin_user.id
+
+    user = User(
+        email=email,
+        full_name=data.full_name,
+        hashed_password=get_password_hash(data.password),
+        phone=data.phone,
+        role=data.role,
+        employment_type=data.employment_type,
+        business_unit=data.business_unit,
+        department_id=department.id if department else None,
+        manager_id=assigned_manager_id,
+        team_lead_id=data.team_lead_id,
+        hr_id=data.hr_id,
+        joining_date=data.joining_date,
+        date_of_birth=data.date_of_birth,
+        gender=data.gender,
+        marital_status=data.marital_status,
+        marriage_date=data.marriage_date,
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    get_or_create_balance(user.id, date.today().year, db)
+
+    # Clean up OTP record after successful registration
+    if email in _otp_store:
+        del _otp_store[email]
+
+    return user
