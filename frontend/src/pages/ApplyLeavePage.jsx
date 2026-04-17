@@ -3,13 +3,14 @@ import { useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
 import { motion, AnimatePresence } from "framer-motion";
 import toast from "react-hot-toast";
-import { applyLeave, getMyBalance, getHolidays, getMyEmergencyOverrideToday } from "../services/api";
+import { applyLeave, getMyBalance, getHolidays, getMyEmergencyOverrideToday, submitWFH, getMySpecialCredits } from "../services/api";
 import { format, differenceInCalendarDays } from "date-fns";
-import { MdCalendarMonth, MdInfo, MdCheckCircle, MdArrowBack, MdSend, MdWarning } from "react-icons/md";
+import { MdCalendarMonth, MdInfo, MdArrowBack, MdSend, MdWarning } from "react-icons/md";
 
 const REQUEST_TYPES = [
   { value: "leave", label: "Leave Request" },
   { value: "weekend_work", label: "Weekend Work Approval Request" },
+  { value: "wfh", label: "Work From Home Request" },
 ];
 
 const ALL_LEAVE_CATEGORIES = [
@@ -18,7 +19,7 @@ const ALL_LEAVE_CATEGORIES = [
   { value: "optional",  label: "Optional Leave",      color: "#f59e0b", desc: "2 days/year",              genders: null },
   { value: "maternity", label: "Maternity Leave",     color: "#ec4899", desc: "90 days",                  genders: ["female"] },
   { value: "paternity", label: "Paternity Leave",     color: "#8b5cf6", desc: "5 days",                   genders: ["male"] },
-  { value: "compensate",label: "Compensate Leave",    color: "#f97316", desc: "Uses Special balance",     genders: null },
+  { value: "compensate",label: "Compensate Leave",    color: "#f97316", desc: "Uses earned Special balance", genders: null },
   { value: "lop",       label: "Leave Without Pay",   color: "#6b7280", desc: "No balance deduction",     genders: null },
 ];
 
@@ -72,6 +73,7 @@ export default function ApplyLeavePage() {
   const [loading, setLoading] = useState(false);
   const [balance, setBalance] = useState(null);
   const [holidays, setHolidays] = useState([]);
+  const [specialCredits, setSpecialCredits] = useState([]);
   const [workingDays, setWorkingDays] = useState(0);
   const [advanceWarning, setAdvanceWarning] = useState("");
   const [weekendWarning, setWeekendWarning] = useState("");
@@ -93,15 +95,20 @@ export default function ApplyLeavePage() {
     getMyBalance().then((r) => setBalance(r.data)).catch(() => {});
     getHolidays(new Date().getFullYear()).then((r) => setHolidays(r.data)).catch(() => {});
     getMyEmergencyOverrideToday().then((r) => setManagerOverrideEnabled(!!r.data?.enabled)).catch(() => {});
+    getMySpecialCredits().then((r) => setSpecialCredits(r.data)).catch(() => {});
   }, []);
 
   const isWeekendRequest = form.request_type === "weekend_work";
+  const isWFH = form.request_type === "wfh";
   const isSick = form.leave_type === "sick";
   const isCasual = form.leave_type === "casual";
   const isLOP = form.leave_type === "lop";
   const isCompensate = form.leave_type === "compensate";
   const selectedCategory = LEAVE_CATEGORIES.find((t) => t.value === form.leave_type);
-  const specialAvailable = Math.max(0, (balance?.special_total || 0) - (balance?.special_used || 0));
+  // Only credits earned >= 15 days ago count as eligible for compensate leave
+  const eligibleSpecialDays = specialCredits.filter((c) => c.is_eligible).reduce((s, c) => s + c.days, 0);
+  const coolingCredits = specialCredits.filter((c) => !c.is_eligible);
+  const specialAvailable = Math.max(0, eligibleSpecialDays - (balance?.special_used || 0));
 
   useEffect(() => {
     if (!form.start_date || !form.end_date) {
@@ -250,6 +257,22 @@ export default function ApplyLeavePage() {
       toast.error("Please provide a reason");
       return;
     }
+
+    // WFH request — separate API
+    if (isWFH) {
+      setLoading(true);
+      try {
+        await submitWFH({ start_date: form.start_date, end_date: form.end_date, reason: form.reason });
+        toast.success("Work from home request submitted to manager.");
+        navigate("/dashboard");
+      } catch (err) {
+        toast.error(err.response?.data?.detail || "Failed to submit WFH request");
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
     if (isCasual && !form.half_day && Number(form.requested_days || 0) !== Number(workingDays || 0)) {
       toast.error(`Selected range has ${workingDays} working day(s). It must match requested ${form.requested_days} day(s).`);
       return;
@@ -306,7 +329,9 @@ export default function ApplyLeavePage() {
           <MdArrowBack />
         </motion.button>
         <div>
-          <h1 className="text-2xl font-extrabold text-gray-900">Apply for Leave</h1>
+          <h1 className="text-2xl font-extrabold text-gray-900">
+            {isWFH ? "Work From Home Request" : "Apply for Leave"}
+          </h1>
           <p className="text-gray-400 text-sm">Submit a request for manager approval</p>
         </div>
       </motion.div>
@@ -320,7 +345,7 @@ export default function ApplyLeavePage() {
             Request Details
           </h3>
 
-          {balance && (
+          {balance && !isWFH && (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {BALANCE_OVERVIEW.map((b) => {
                 const used = balance[`${b.key}_used`] || 0;
@@ -354,7 +379,7 @@ export default function ApplyLeavePage() {
               </select>
             </div>
 
-            {!isWeekendRequest && (
+            {!isWeekendRequest && !isWFH && (
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-1.5">Leave Category *</label>
                 <select
@@ -364,9 +389,16 @@ export default function ApplyLeavePage() {
                 >
                   {LEAVE_CATEGORIES.map((t) => {
                     const disabled = t.value === "compensate" && specialAvailable < 1;
+                    const nextAvailable = disabled && coolingCredits.length > 0
+                      ? new Date(coolingCredits[0].available_from).toLocaleDateString("en-IN", { day: "numeric", month: "short" })
+                      : null;
                     return (
                       <option key={t.value} value={t.value} disabled={disabled}>
-                        {disabled ? `${t.label} (requires special >= 1)` : t.label}
+                        {disabled
+                          ? nextAvailable
+                            ? `${t.label} — available from ${nextAvailable}`
+                            : `${t.label} — no special balance`
+                          : t.label}
                       </option>
                     );
                   })}
@@ -375,7 +407,7 @@ export default function ApplyLeavePage() {
             )}
           </div>
 
-          {!isWeekendRequest && selectedCategory && (
+          {!isWeekendRequest && !isWFH && selectedCategory && (
             <div
               className="rounded-xl px-4 py-3 text-sm border"
               style={{ background: `${selectedCategory.color}10`, color: selectedCategory.color, borderColor: `${selectedCategory.color}30` }}
@@ -384,15 +416,44 @@ export default function ApplyLeavePage() {
               {isLOP
                 ? "No balance deducted. Salary will be adjusted for these days."
                 : isCompensate
-                  ? `${available} day(s) available in Special balance for compensate leave.`
+                  ? `${specialAvailable} day(s) eligible for compensate leave.`
                   : `${available} day(s) available. ${selectedCategory.desc}.`}
+            </div>
+          )}
+
+          {isCompensate && coolingCredits.length > 0 && (
+            <div className="rounded-xl px-4 py-3 text-sm border bg-amber-50 border-amber-200 space-y-2">
+              <p className="font-semibold text-amber-700 flex items-center gap-2">
+                <MdWarning className="text-base flex-shrink-0" />
+                Special leave under 15-day cooling period — not yet available:
+              </p>
+              {coolingCredits.map((c) => (
+                <div key={c.id} className="ml-6 text-amber-700 bg-amber-100/60 rounded-lg px-3 py-2 space-y-0.5">
+                  <p><strong>{c.days} day(s)</strong> earned for working on{" "}
+                    <strong>{new Date(c.work_date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</strong>
+                  </p>
+                  <p className="text-amber-600 text-xs">
+                    Approved on {new Date(c.earned_date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                    {" · "}Available to use from{" "}
+                    <strong>{new Date(c.available_from).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</strong>
+                  </p>
+                </div>
+              ))}
             </div>
           )}
 
           {isWeekendRequest && (
             <div className="rounded-xl px-4 py-3 text-sm border bg-orange-50 text-orange-700 border-orange-200">
               <MdInfo className="inline-block mr-2 text-base align-text-bottom" />
-              Special leaves earned through weekend or holiday work will be updated accordingly. Compensatory leave can be availed only 15 days after the date it is earned.
+             Employees who work on weekends or holidays can apply for Special  Leave, subject to manager approval. Once approved, the special leave balance will be credited and can be availed after 15 days from the date earned.
+
+            </div>
+          )}
+
+          {isWFH && (
+            <div className="rounded-xl px-4 py-3 text-sm border bg-blue-50 text-blue-700 border-blue-200">
+              <MdInfo className="inline-block mr-2 text-base align-text-bottom" />
+              Work from home requests are sent to your manager for approval. Select the date(s) and provide a reason below.
             </div>
           )}
         </motion.div>
@@ -405,7 +466,7 @@ export default function ApplyLeavePage() {
             Select Dates & Options
           </h3>
 
-          {!isWeekendRequest && isSick && (
+          {!isWeekendRequest && !isWFH && isSick && (
             <label className="flex items-center gap-3 p-3.5 rounded-xl border-2 cursor-pointer mb-3 transition-all"
               style={{ borderColor: "#10b981", background: "#f0fdf4" }}>
               <input
@@ -420,7 +481,7 @@ export default function ApplyLeavePage() {
             </label>
           )}
 
-          {!isWeekendRequest && managerOverrideEnabled && (
+          {!isWeekendRequest && !isWFH && managerOverrideEnabled && (
             <div className="mb-3 p-3.5 rounded-xl border border-red-200 bg-red-50">
               <span className="font-medium text-red-700">Emergency Override Enabled By Manager</span>
               <p className="text-xs text-red-600 mt-0.5">
@@ -429,7 +490,7 @@ export default function ApplyLeavePage() {
             </div>
           )}
 
-          {!isWeekendRequest && isCasual && !form.half_day && (
+          {!isWeekendRequest && !isWFH && isCasual && !form.half_day && (
             <div className="mb-3">
               <label className="block text-sm font-semibold text-gray-700 mb-1.5">Number of Leave Days *</label>
               <select
@@ -449,7 +510,7 @@ export default function ApplyLeavePage() {
           )}
 
 
-          {!isWeekendRequest && (
+          {!isWeekendRequest && !isWFH && (
             <label className="flex items-center gap-3 p-3.5 rounded-xl border-2 cursor-pointer mb-4 transition-all"
               style={form.half_day ? { borderColor: "#3b82f6", background: "#eff6ff" } : { borderColor: "#e5e7eb" }}>
               <input
@@ -479,17 +540,17 @@ export default function ApplyLeavePage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                {!isWeekendRequest && form.half_day ? "Date" : "Start Date"} *
+                {!isWeekendRequest && !isWFH && form.half_day ? "Date" : "Start Date"} *
               </label>
               <input
                 type="date"
                 value={form.start_date}
-                min={minStartDate}
+                min={isWFH ? undefined : minStartDate}
                 onChange={(e) =>
                   setForm((f) => ({
                     ...f,
                     start_date: e.target.value,
-                    end_date: !isWeekendRequest && f.half_day ? e.target.value : f.end_date,
+                    end_date: !isWeekendRequest && !isWFH && f.half_day ? e.target.value : f.end_date,
                   }))
                 }
                 className="input-field"
@@ -497,13 +558,13 @@ export default function ApplyLeavePage() {
               />
             </div>
 
-            {!(!isWeekendRequest && form.half_day) && (
+            {!((!isWeekendRequest && !isWFH) && form.half_day) && (
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-1.5">End Date *</label>
                 <input
                   type="date"
                   value={form.end_date}
-                  min={form.start_date || minStartDate}
+                  min={form.start_date || (isWFH ? undefined : minStartDate)}
                   onChange={(e) => setForm((f) => ({ ...f, end_date: e.target.value }))}
                   className="input-field"
                   required
@@ -519,19 +580,19 @@ export default function ApplyLeavePage() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0 }}
                 className={`mt-4 flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-medium ${
-                  isInsufficient ? "bg-red-50 text-red-600" : "bg-green-50 text-green-700"
+                  isWFH ? "bg-blue-50 text-blue-700" : isInsufficient ? "bg-red-50 text-red-600" : "bg-green-50 text-green-700"
                 }`}
               >
                 <MdCalendarMonth className="text-lg" />
                 <span>
-                  <strong>{workingDays}</strong> {isWeekendRequest ? "weekend day(s) requested for credit" : "working day(s) requested"}
+                  <strong>{workingDays}</strong> {isWFH ? "working day(s) requested for WFH" : isWeekendRequest ? "weekend day(s) requested for credit" : "working day(s) requested"}
                 </span>
               </motion.div>
             )}
           </AnimatePresence>
 
           <AnimatePresence>
-            {advanceWarning && !isWeekendRequest && (
+            {advanceWarning && !isWeekendRequest && !isWFH && (
               <motion.div
                 initial={{ opacity: 0, y: -6 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -595,7 +656,7 @@ export default function ApplyLeavePage() {
           </button>
           <motion.button
             type="submit"
-            disabled={loading || isInsufficient || (!!weekendWarning && isWeekendRequest) || (!isWeekendRequest && isCompensate && specialAvailable < 1) || advanceWarning.startsWith("advance notice required")}
+            disabled={loading || (!isWFH && isInsufficient) || (!!weekendWarning && isWeekendRequest) || (!isWeekendRequest && !isWFH && isCompensate && specialAvailable < 1) || (!isWFH && advanceWarning.startsWith("advance notice required"))}
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             className="flex-1 py-3 bg-gradient-to-r from-blue-600 to-violet-600 text-white rounded-xl font-bold shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-shadow"

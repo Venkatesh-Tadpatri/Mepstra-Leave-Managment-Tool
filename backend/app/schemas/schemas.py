@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, field_validator
+from pydantic import BaseModel, EmailStr, field_validator, model_validator
 from typing import Optional, List
 from datetime import date, datetime
 from app.models.models import UserRole, LeaveType, LeaveStatus, HolidayType, EmploymentType, BusinessUnit, Gender, MaritalStatus
@@ -6,7 +6,7 @@ import re
 
 
 def _is_company_email(email: str) -> bool:
-    return bool(re.match(r"^[^@]+@(mepstra|mepsrta)\.com$", email))
+    return bool(re.match(r"^[^@]+@(mepstra|mepstra)\.com$", email))
 
 
 def _is_allowed_gmail(email: str) -> bool:
@@ -14,7 +14,7 @@ def _is_allowed_gmail(email: str) -> bool:
         return False
 
     username = email.split("@")[0]
-    return "mepstra" in username.lower() or "mepsrta" in username.lower()
+    return "mepstra" in username.lower() or "mepstra" in username.lower()
 
 
 # ─── Auth ───────────────────────────────────────────────
@@ -41,7 +41,7 @@ class OTPSendRequest(BaseModel):
             return v
         if _is_allowed_gmail(v):
             return v
-        raise ValueError("Only @mepstra.com, @mepsrta.com, or Gmail IDs containing 'mepstra'/'mepsrta' are allowed")
+        raise ValueError("Only @mepstra.com, @mepstra.com, or Gmail IDs containing 'mepstra'/'mepstra' are allowed")
 
 
 class OTPVerifyRequest(BaseModel):
@@ -93,7 +93,7 @@ class UserCreate(BaseModel):
             return v
         if _is_allowed_gmail(v):
             return v
-        raise ValueError("Only @mepstra.com, @mepsrta.com, or Gmail IDs containing 'mepstra'/'mepsrta' are allowed")
+        raise ValueError("Only @mepstra.com, @mepstra.com, or Gmail IDs containing 'mepstra'/'mepstra' are allowed")
 
     @field_validator("password")
     @classmethod
@@ -162,6 +162,7 @@ class UserSummary(BaseModel):
     full_name: str
     email: str
     role: UserRole
+    profile_image: Optional[str] = None
     department: Optional[DepartmentResponse] = None
 
     model_config = {"from_attributes": True}
@@ -270,19 +271,84 @@ class DashboardStats(BaseModel):
 
 
 # ─── Allowed Emails ──────────────────────────────────────
+# ─── Work From Home ──────────────────────────────────────
+class WFHCreate(BaseModel):
+    start_date: date
+    end_date: date
+    reason: str
+
+    @field_validator("end_date")
+    @classmethod
+    def end_after_start(cls, v, info):
+        if info.data.get("start_date") and v < info.data["start_date"]:
+            raise ValueError("end_date must be >= start_date")
+        return v
+
+
+class WFHUpdate(BaseModel):
+    action: str   # "approve" | "reject"
+    comment: Optional[str] = None
+
+
+class WFHResponse(BaseModel):
+    id: int
+    user_id: int
+    start_date: date
+    end_date: date
+    total_days: float
+    reason: str
+    status: str
+    manager_comment: Optional[str] = None
+    manager_action_at: Optional[datetime] = None
+    created_at: datetime
+    user: Optional[UserSummary] = None
+    manager: Optional[UserSummary] = None
+
+    model_config = {"from_attributes": True}
+
+
 class AllowedEmailCreate(BaseModel):
-    email: str
+    employee_name: str
+    outlook_email: Optional[str] = None
+    gmail: Optional[str] = None
     notes: Optional[str] = None
 
-    @field_validator("email")
+    @field_validator("outlook_email", "gmail", mode="before")
     @classmethod
-    def normalize_email(cls, v: str) -> str:
-        return v.strip().lower()
+    def normalize_email_field(cls, v: Optional[str]) -> Optional[str]:
+        return v.strip().lower() if v and v.strip() else None
+
+    @field_validator("employee_name")
+    @classmethod
+    def normalize_name(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("Employee name is required")
+        return v
+
+    @model_validator(mode="after")
+    def at_least_one_email(self) -> "AllowedEmailCreate":
+        if not self.outlook_email and not self.gmail:
+            raise ValueError("At least one email (Outlook or Gmail) is required")
+        return self
+
+
+class AllowedEmailUpdate(BaseModel):
+    outlook_email: Optional[str] = None
+    gmail: Optional[str] = None
+    notes: Optional[str] = None
+
+    @field_validator("outlook_email", "gmail", mode="before")
+    @classmethod
+    def normalize_email_field(cls, v: Optional[str]) -> Optional[str]:
+        return v.strip().lower() if v and v.strip() else None
 
 
 class AllowedEmailResponse(BaseModel):
     id: int
-    email: str
+    employee_name: str
+    outlook_email: Optional[str] = None
+    gmail: Optional[str] = None
     notes: Optional[str] = None
     created_at: datetime
 

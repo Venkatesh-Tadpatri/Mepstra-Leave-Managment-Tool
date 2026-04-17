@@ -6,11 +6,11 @@ import {
   PieChart, Pie, Cell, Legend, Tooltip, ResponsiveContainer
 } from "recharts";
 import toast from "react-hot-toast";
-import { getDashboardStats, getEmployeeLeaveReport, getMyStats, getOnLeaveToday, getLeaveSchedule, getDepartments } from "../services/api";
+import { getDashboardStats, getEmployeeLeaveReport, getMyStats, getOnLeaveToday, getLeaveSchedule, getDepartments, getWFHToday } from "../services/api";
 import {
   MdPeople, MdPendingActions, MdCheckCircle, MdPersonOff,
   MdEventNote, MdCalendarMonth, MdArrowForward,
-  MdFileDownload, MdPictureAsPdf, MdClose, MdBeachAccess
+  MdFileDownload, MdPictureAsPdf, MdClose, MdBeachAccess, MdLaptop
 } from "react-icons/md";
 
 const fadeUp = { hidden: { opacity: 0, y: 24 }, show: { opacity: 1, y: 0 } };
@@ -112,6 +112,7 @@ export default function DashboardPage() {
   const [filter] = useState({ year: new Date().getFullYear() });
   const [onLeaveList, setOnLeaveList] = useState(null); // null = modal closed
   const [todayOnLeave, setTodayOnLeave] = useState([]);
+  const [todayWFH, setTodayWFH] = useState([]);
   const [schedule, setSchedule] = useState([]);
   const [scheduleMonth, setScheduleMonth] = useState(new Date().getMonth() + 1);
   const [scheduleYear, setScheduleYear] = useState(new Date().getFullYear());
@@ -131,6 +132,7 @@ export default function DashboardPage() {
     if (!isStrictAdmin) getMyStats().then((r) => setMyStats(r.data)).catch(() => {});
     if (showScheduleSection) {
       getOnLeaveToday().then((r) => setTodayOnLeave(r.data)).catch(() => {});
+      getWFHToday().then((r) => setTodayWFH(r.data)).catch(() => {});
       getLeaveSchedule(new Date().getMonth() + 1, new Date().getFullYear(), null, 0)
         .then((r) => setSchedule(r.data)).catch(() => {});
     }
@@ -512,6 +514,61 @@ export default function DashboardPage() {
                       <td className="px-4 py-3">
                         <span className="capitalize px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">{e.leave_type}</span>
                       </td>
+                      <td className="px-4 py-3 text-gray-600">{e.start_date}</td>
+                      <td className="px-4 py-3 text-gray-600">{e.end_date}</td>
+                      <td className="px-4 py-3 font-bold text-gray-800">{e.total_days}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </motion.div>
+      )}
+
+      {/* ── Admin/Manager: Work From Home Today ── */}
+      {showScheduleSection && (
+        <motion.div variants={fadeUp} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-gray-50">
+            <div className="flex items-center gap-2">
+              <MdLaptop className="text-blue-500 text-xl" />
+              <h3 className="font-bold text-gray-900">Work From Home Today</h3>
+              <span className="ml-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
+                {todayWFH.length}
+              </span>
+            </div>
+            <span className="text-xs text-gray-400">
+              {new Date().toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}
+            </span>
+          </div>
+
+          {todayWFH.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-10 text-gray-300">
+              <MdLaptop className="text-4xl mb-2" />
+              <p className="text-sm">No employees working from home today</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-100">
+                    {["Employee", "Department", "From", "To", "Days"].map((h) => (
+                      <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {todayWFH.map((e, i) => (
+                    <tr key={e.id} className={`border-b border-gray-50 ${i % 2 === 0 ? "" : "bg-gray-50/50"}`}>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-400 to-violet-500 flex items-center justify-center text-white font-bold text-xs flex-shrink-0">
+                            {e.employee_name?.[0]?.toUpperCase()}
+                          </div>
+                          <span className="font-semibold text-gray-800">{e.employee_name}</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-gray-500">{e.department || "—"}</td>
                       <td className="px-4 py-3 text-gray-600">{e.start_date}</td>
                       <td className="px-4 py-3 text-gray-600">{e.end_date}</td>
                       <td className="px-4 py-3 font-bold text-gray-800">{e.total_days}</td>

@@ -187,14 +187,45 @@ class Holiday(Base):
 
 
 class AllowedEmail(Base):
-    """Whitelist of email addresses permitted to register."""
+    """Whitelist of email addresses permitted to register — one row per employee."""
     __tablename__ = "allowed_emails"
 
     id = Column(Integer, primary_key=True, index=True)
-    email = Column(String(255), unique=True, index=True, nullable=False)
+    employee_name = Column(String(255), nullable=False)
+    outlook_email = Column(String(255), unique=True, nullable=True, index=True)
+    gmail = Column(String(255), unique=True, nullable=True, index=True)
+    email = Column(String(255), nullable=True)   # legacy column — kept so existing rows are not lost
     notes = Column(String(255), nullable=True)
     added_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class WFHStatus(str, enum.Enum):
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+    CANCELLED = "cancelled"
+
+
+class WorkFromHomeRequest(Base):
+    """Work-from-home request submitted by an employee, approved by their manager."""
+    __tablename__ = "wfh_requests"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    start_date = Column(Date, nullable=False)
+    end_date = Column(Date, nullable=False)
+    total_days = Column(Float, nullable=False, default=1.0)
+    reason = Column(Text, nullable=False)
+    status = Column(SAEnum(WFHStatus), default=WFHStatus.PENDING, nullable=False)
+    manager_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    manager_comment = Column(Text, nullable=True)
+    manager_action_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    user = relationship("User", foreign_keys=[user_id])
+    manager = relationship("User", foreign_keys=[manager_id])
 
 
 class SpecialLeaveCredit(Base):
@@ -205,5 +236,6 @@ class SpecialLeaveCredit(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     year = Column(Integer, nullable=False)
     days = Column(Float, nullable=False)
-    earned_date = Column(Date, nullable=False)   # date when weekend work was approved
+    work_date = Column(Date, nullable=True)       # actual date(s) the employee worked (start_date of the request)
+    earned_date = Column(Date, nullable=False)    # date the request was approved (credit recorded)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

@@ -2,11 +2,11 @@ import { useRef, useState } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import toast from "react-hot-toast";
 import { motion } from "framer-motion";
-import { updateMe, uploadAvatar } from "../services/api";
+import { updateMe, uploadAvatar, removeAvatar } from "../services/api";
 import { updateUser } from "../store/slices/authSlice";
 import {
   MdPerson, MdEmail, MdPhone, MdWork, MdCalendarMonth,
-  MdEdit, MdSave, MdClose, MdVerified, MdCameraAlt,
+  MdEdit, MdSave, MdClose, MdVerified, MdCameraAlt, MdDeleteOutline,
   MdCake, MdFavorite, MdWc,
 } from "react-icons/md";
 
@@ -60,6 +60,19 @@ export default function ProfilePage() {
       toast.error(err.response?.data?.detail || "Update failed");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleRemoveAvatar() {
+    setAvatarLoading(true);
+    try {
+      const res = await removeAvatar();
+      dispatch(updateUser(res.data));
+      toast.success("Profile photo removed");
+    } catch (err) {
+      toast.error(err.response?.data?.detail || "Remove failed");
+    } finally {
+      setAvatarLoading(false);
     }
   }
 
@@ -135,6 +148,19 @@ export default function ProfilePage() {
                 <MdCameraAlt className="text-xs" />
               )}
             </motion.button>
+            {/* Remove photo button — only when photo exists */}
+            {avatarSrc && (
+              <motion.button
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.9 }}
+                onClick={handleRemoveAvatar}
+                disabled={avatarLoading}
+                title="Remove profile photo"
+                className="absolute -top-1 -right-1 w-6 h-6 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center shadow-md disabled:opacity-60 transition-colors"
+              >
+                <MdDeleteOutline className="text-xs" />
+              </motion.button>
+            )}
             <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
           </div>
 
@@ -154,7 +180,10 @@ export default function ProfilePage() {
             </div>
           </div>
         </div>
-        <p className="text-xs text-gray-400 mt-3">Click the camera icon to upload a new profile photo.</p>
+        <p className="text-xs text-gray-400 mt-3">
+          Click the <span className="text-blue-500 font-medium">camera icon</span> to upload a photo
+          {avatarSrc && <>, or the <span className="text-red-400 font-medium">red × icon</span> to remove it</>}.
+        </p>
       </motion.div>
 
       {/* Personal info */}

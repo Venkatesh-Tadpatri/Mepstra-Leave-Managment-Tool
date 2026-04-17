@@ -4,7 +4,7 @@ from fastapi.staticfiles import StaticFiles
 from app.core.config import settings
 from app.db.database import engine, Base
 from app.models import models  # ensure models are imported before create_all
-from app.api.routes import auth, users, leaves, holidays, departments, dashboard, allowed_emails
+from app.api.routes import auth, users, leaves, holidays, departments, dashboard, allowed_emails, wfh
 from app.db.seed import seed_data
 from app.db.migrate import run_migrations
 import os
@@ -80,6 +80,7 @@ app.include_router(holidays.router, prefix="/api")
 app.include_router(departments.router, prefix="/api")
 app.include_router(dashboard.router, prefix="/api")
 app.include_router(allowed_emails.router, prefix="/api")
+app.include_router(wfh.router, prefix="/api")
 
 
 @app.on_event("startup")

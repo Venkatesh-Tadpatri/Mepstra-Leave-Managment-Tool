@@ -37,9 +37,9 @@ def _email_variants(email: str) -> list[str]:
     variants = [normalized]
 
     if normalized.endswith("@mepstra.com"):
-        variants.append(normalized.replace("@mepstra.com", "@mepsrta.com"))
-    elif normalized.endswith("@mepsrta.com"):
-        variants.append(normalized.replace("@mepsrta.com", "@mepstra.com"))
+        variants.append(normalized.replace("@mepstra.com", "@mepstra.com"))
+    elif normalized.endswith("@mepstra.com"):
+        variants.append(normalized.replace("@mepstra.com", "@mepstra.com"))
 
     return list(dict.fromkeys(variants))
 
@@ -163,7 +163,7 @@ def seed_data():
         sales_dept = departments[("Sales Team", BusinessUnit.MEPSTRA_POWER_SOLUTIONS)]
         plant_dept = departments[("Plant Team", BusinessUnit.MEPSTRA_POWER_SOLUTIONS)]
 
-        admin = _get_or_create_demo_user(db, "admin@mepsrta.com", {
+        admin = _get_or_create_demo_user(db, "admin@mepstra.com", {
             "full_name": "Deepak Dixith",
             "hashed_password": get_password_hash("1234"),
             "role": UserRole.ADMIN,
@@ -175,7 +175,7 @@ def seed_data():
         })
 
 
-        hr_user = _get_or_create_demo_user(db, "hr@mepsrta.com", {
+        hr_user = _get_or_create_demo_user(db, "hr@mepstra.com", {
             "full_name": "Kavya Reddy",
             "hashed_password": get_password_hash("1234"),
             "role": UserRole.HR,
@@ -186,7 +186,7 @@ def seed_data():
             "is_active": True,
         })
 
-        main_mgr = _get_or_create_demo_user(db, "mainmanager@mepsrta.com", {
+        main_mgr = _get_or_create_demo_user(db, "mainmanager@mepstra.com", {
             "full_name": "Srinivas Rao",
             "hashed_password": get_password_hash("1234"),
             "role": UserRole.MAIN_MANAGER,
@@ -198,7 +198,7 @@ def seed_data():
             "is_active": True,
         })
 
-        manager = _get_or_create_demo_user(db, "manager@mepsrta.com", {
+        manager = _get_or_create_demo_user(db, "manager@mepstra.com", {
             "full_name": "Rahul Varma",
             "hashed_password": get_password_hash("1234"),
             "role": UserRole.MANAGER,
@@ -211,7 +211,7 @@ def seed_data():
             "is_active": True,
         })
 
-        employee = _get_or_create_demo_user(db, "employee@mepsrta.com", {
+        employee = _get_or_create_demo_user(db, "employee@mepstra.com", {
             "full_name": "Ananya Sharma",
             "hashed_password": get_password_hash("1234"),
             "role": UserRole.EMPLOYEE,

@@ -23,13 +23,18 @@ def _is_weekend_work_request(leave: LeaveRequest) -> bool:
 
 
 def _credit_special_leave(leave: LeaveRequest, balance: LeaveBalance, db: Session):
-    """Credit special leave balance and record a SpecialLeaveCredit for the 15-day avail rule."""
+    """Credit special leave balance and record a SpecialLeaveCredit for the 15-day avail rule.
+    work_date  = the date the employee actually worked (start_date of the weekend request).
+    earned_date = the date the credit was approved/granted (today).
+    The 15-day cooling period is measured from work_date.
+    """
     balance.special_total += leave.total_days
     credit = SpecialLeaveCredit(
         user_id=leave.user_id,
         year=leave.start_date.year,
         days=leave.total_days,
-        earned_date=date.today(),
+        work_date=leave.start_date,   # actual date worked
+        earned_date=date.today(),     # approval date
     )
     db.add(credit)
 
@@ -145,6 +150,34 @@ def get_balance(year: Optional[int] = None, db: Session = Depends(get_db),
                 current_user: User = Depends(get_current_user)):
     y = year or date.today().year
     return get_or_create_balance(current_user.id, y, db)
+
+
+@router.get("/special-credits")
+def get_special_credits(year: Optional[int] = None, db: Session = Depends(get_db),
+                        current_user: User = Depends(get_current_user)):
+    """Return all special leave credits for the current user with cooling-period info."""
+    from datetime import timedelta
+    y = year or date.today().year
+    credits = db.query(SpecialLeaveCredit).filter(
+        SpecialLeaveCredit.user_id == current_user.id,
+        SpecialLeaveCredit.year == y,
+    ).order_by(SpecialLeaveCredit.earned_date).all()
+    today = date.today()
+    result = []
+    for c in credits:
+        # Cooling period starts from work_date (when employee actually worked).
+        # Fall back to earned_date for legacy rows that predate the work_date column.
+        cooling_start = c.work_date if c.work_date else c.earned_date
+        available_from = cooling_start + timedelta(days=15)
+        result.append({
+            "id": c.id,
+            "days": c.days,
+            "work_date": str(cooling_start),
+            "earned_date": str(c.earned_date),
+            "available_from": str(available_from),
+            "is_eligible": today >= available_from,
+        })
+    return result
 
 
 @router.get("/balance/{user_id}", response_model=LeaveBalanceResponse)

@@ -1,24 +1,23 @@
 import { NavLink } from "react-router-dom";
-import { useSelector, useDispatch } from "react-redux";
+import { useSelector } from "react-redux";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   MdDashboard, MdEventNote, MdAddCircleOutline, MdPendingActions,
   MdCalendarMonth, MdHolidayVillage, MdPeople, MdAccountBalance, MdPerson,
   MdEditCalendar, MdShield
 } from "react-icons/md";
-import { toggleSidebar } from "../../store/slices/uiSlice";
 
 const navItems = [
   { to: "/dashboard",   icon: MdDashboard,        label: "Dashboard",   roles: ["all"],                                                          color: "from-blue-500 to-cyan-400" },
   { to: "/leaves",      icon: MdEventNote,        label: "My Leaves",   roles: ["manager","hr"],                                                 color: "from-indigo-500 to-blue-400" },
   { to: "/leaves/apply",icon: MdAddCircleOutline,  label: "Apply Leave", roles: ["employee","team_lead","manager","hr"],                          color: "from-green-500 to-emerald-400" },
-  { to: "/approvals",   icon: MdPendingActions,    label: "Approvals",   roles: ["team_lead","manager","main_manager","admin","hr"],              color: "from-orange-500 to-amber-400" },
+  { to: "/approvals",   icon: MdPendingActions,    label: "Approvals",   roles: ["employee","team_lead","manager","main_manager","admin","hr"],  color: "from-orange-500 to-amber-400" },
   { to: "/calendar",    icon: MdCalendarMonth,     label: "Calendar",    roles: ["all"],                                                          color: "from-pink-500 to-rose-400" },
   { to: "/holidays",    icon: MdHolidayVillage,    label: "Holidays",    roles: ["all"],                                                          color: "from-indigo-500 to-blue-400" },
   { to: "/holidays/update", icon: MdEditCalendar,  label: "Update Holidays", roles: ["admin","main_manager","hr"],                               color: "from-violet-500 to-purple-400" },
   { to: "/employees",   icon: MdPeople,            label: "Employees",   roles: ["admin","main_manager","manager","hr"],                          color: "from-teal-500 to-cyan-400" },
   { to: "/departments",    icon: MdAccountBalance, label: "Departments",      roles: ["admin","main_manager"],                                    color: "from-red-500 to-pink-400" },
-  { to: "/allowed-emails", icon: MdShield,         label: "Email Whitelist",  roles: ["admin"],                                                   color: "from-emerald-500 to-green-400" },
+  { to: "/allowed-emails", icon: MdShield,         label: "Email Whitelist",  roles: ["admin", "hr"],                                             color: "from-emerald-500 to-green-400" },
   { to: "/profile",        icon: MdPerson,         label: "Profile",          roles: ["all"],                                                     color: "from-slate-500 to-gray-400" },
 ];
 
@@ -104,25 +103,6 @@ export default function Sidebar() {
         ))}
       </nav>
 
-      {/* User card at bottom */}
-      <AnimatePresence>
-        {sidebarOpen && user && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }}
-            className="absolute bottom-0 left-0 right-0 p-3"
-          >
-            <div className="bg-white/10 backdrop-blur rounded-xl p-3 flex items-center gap-3 border border-white/10">
-              <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
-                {user.full_name?.[0]?.toUpperCase()}
-              </div>
-              <div className="overflow-hidden">
-                <p className="text-white text-xs font-semibold truncate">{user.full_name}</p>
-                <p className="text-blue-300 text-xs capitalize">{user.role?.replace("_", " ")}</p>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </motion.aside>
   );
 }

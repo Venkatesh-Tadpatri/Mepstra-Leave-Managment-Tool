@@ -11,7 +11,8 @@ API.interceptors.request.use((config) => {
 API.interceptors.response.use(
   (res) => res,
   (err) => {
-    if (err.response?.status === 401) {
+    const isAuthEndpoint = err.config?.url?.includes("/auth/");
+    if (err.response?.status === 401 && !isAuthEndpoint) {
       localStorage.removeItem("token");
       window.location.href = "/login";
     }
@@ -33,6 +34,7 @@ export const uploadAvatar = (file) => {
   form.append("file", file);
   return API.post("/users/me/avatar", form, { headers: { "Content-Type": "multipart/form-data" } });
 };
+export const removeAvatar = () => API.delete("/users/me/avatar");
 export const getUsers = (params) => API.get("/users", { params });
 export const getManagers = () => API.get("/users/managers");
 export const getAdminUser = () => API.get("/users/admin");
@@ -54,6 +56,7 @@ export const getLeave = (id) => API.get(`/leaves/${id}`);
 export const actionLeave = (id, data) => API.put(`/leaves/${id}/action`, data);
 export const cancelLeave = (id) => API.delete(`/leaves/${id}`);
 export const getMyBalance = (year) => API.get("/leaves/balance", { params: { year } });
+export const getMySpecialCredits = (year) => API.get("/leaves/special-credits", { params: { year } });
 export const getUserBalance = (userId, year) => API.get(`/leaves/balance/${userId}`, { params: { year } });
 
 // Holidays
@@ -77,7 +80,17 @@ export const getLeaveSchedule = (month, year, day, department_id) =>
   API.get("/dashboard/leave-schedule", { params: { month, year, day: day || undefined, department_id: department_id || undefined } });
 export const getEmployeeLeaveReport = (year) => API.get("/dashboard/employee-leave-report", { params: { year } });
 
+// Work From Home
+export const submitWFH = (data) => API.post("/wfh", data);
+export const getMyWFH = () => API.get("/wfh/mine");
+export const getPendingWFH = () => API.get("/wfh/pending");
+export const getAllWFH = () => API.get("/wfh/all");
+export const getWFHToday = () => API.get("/wfh/today");
+export const actionWFH = (id, data) => API.patch(`/wfh/${id}`, data);
+export const cancelWFH = (id) => API.delete(`/wfh/${id}`);
+
 // Allowed Emails (admin whitelist)
 export const getAllowedEmails = () => API.get("/allowed-emails");
 export const addAllowedEmail = (data) => API.post("/allowed-emails", data);
+export const updateAllowedEmail = (id, data) => API.patch(`/allowed-emails/${id}`, data);
 export const removeAllowedEmail = (id) => API.delete(`/allowed-emails/${id}`);

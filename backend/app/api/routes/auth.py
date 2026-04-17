@@ -31,9 +31,9 @@ def _email_candidates(email: str) -> list[str]:
     candidates = [normalized]
 
     if normalized.endswith("@mepstra.com"):
-        candidates.append(normalized.replace("@mepstra.com", "@mepsrta.com"))
-    elif normalized.endswith("@mepsrta.com"):
-        candidates.append(normalized.replace("@mepsrta.com", "@mepstra.com"))
+        candidates.append(normalized.replace("@mepstra.com", "@mepstra.com"))
+    elif normalized.endswith("@mepstra.com"):
+        candidates.append(normalized.replace("@mepstra.com", "@mepstra.com"))
 
     # Preserve order while removing duplicates.
     return list(dict.fromkeys(candidates))
@@ -68,8 +68,28 @@ def login_swagger(form: OAuth2PasswordRequestForm = Depends(), db: Session = Dep
 def send_otp(data: OTPSendRequest, db: Session = Depends(get_db)):
     """Send a 6-digit OTP to the given email for registration verification."""
     email = data.email.strip().lower()
+
     if db.query(User).filter(User.email == email).first():
         raise HTTPException(status_code=400, detail="Email already registered")
+
+    # If whitelist is non-empty, only pre-approved emails may register
+    allowed_count = db.query(AllowedEmail).count()
+    if allowed_count > 0:
+        allowed = db.query(AllowedEmail).filter(
+            or_(AllowedEmail.outlook_email == email, AllowedEmail.gmail == email)
+        ).first()
+        if not allowed:
+            raise HTTPException(
+                status_code=400,
+                detail="This email is not registered in the company database. Please contact your administrator to get added."
+            )
+        # Block if the other email for the same employee is already registered
+        other = allowed.gmail if allowed.outlook_email == email else allowed.outlook_email
+        if other and db.query(User).filter(User.email == other).first():
+            raise HTTPException(
+                status_code=400,
+                detail="An account already exists for this employee. Each employee can only register once.",
+            )
 
     otp = _generate_otp()
     _otp_store[email] = {
@@ -125,11 +145,20 @@ def register(data: UserCreate, db: Session = Depends(get_db)):
     # Check against allowed email whitelist (if the list is non-empty, only those emails may register)
     allowed_count = db.query(AllowedEmail).count()
     if allowed_count > 0:
-        allowed = db.query(AllowedEmail).filter(AllowedEmail.email == email).first()
+        allowed = db.query(AllowedEmail).filter(
+            or_(AllowedEmail.outlook_email == email, AllowedEmail.gmail == email)
+        ).first()
         if not allowed:
             raise HTTPException(
                 status_code=400,
                 detail="Your email is not in the approved registration list. Please contact the administrator."
+            )
+        # Block if the other email for the same employee is already registered
+        other = allowed.gmail if allowed.outlook_email == email else allowed.outlook_email
+        if other and db.query(User).filter(User.email == other).first():
+            raise HTTPException(
+                status_code=400,
+                detail="An account already exists for this employee. Each employee can only register once.",
             )
 
     if db.query(User).filter(User.email == email).first():

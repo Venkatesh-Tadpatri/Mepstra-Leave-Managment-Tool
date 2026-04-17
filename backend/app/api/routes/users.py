@@ -44,6 +44,19 @@ def upload_avatar(file: UploadFile = File(...), db: Session = Depends(get_db),
     return current_user
 
 
+@router.delete("/me/avatar", response_model=UserResponse)
+def remove_avatar(db: Session = Depends(get_db),
+                  current_user: User = Depends(get_current_user)):
+    if current_user.profile_image:
+        file_path = current_user.profile_image.lstrip("/")
+        if os.path.exists(file_path):
+            os.remove(file_path)
+        current_user.profile_image = None
+        db.commit()
+        db.refresh(current_user)
+    return current_user
+
+
 @router.get("", response_model=List[UserResponse])
 def list_users(role: Optional[str] = None, department_id: Optional[int] = None,
                db: Session = Depends(get_db),

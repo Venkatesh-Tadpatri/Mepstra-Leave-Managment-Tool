@@ -32,6 +32,16 @@ def _get_column_type(conn, table: str, column: str) -> str:
     return row[0] if row else ""
 
 
+def _is_column_nullable(conn, table: str, column: str) -> bool:
+    result = conn.execute(text(
+        "SELECT IS_NULLABLE FROM INFORMATION_SCHEMA.COLUMNS "
+        "WHERE TABLE_SCHEMA = DATABASE() "
+        "AND TABLE_NAME = :table AND COLUMN_NAME = :col"
+    ), {"table": table, "col": column})
+    row = result.fetchone()
+    return row[0] == "YES" if row else True
+
+
 def _index_exists(conn, table: str, index_name: str) -> bool:
     result = conn.execute(text(
         "SELECT COUNT(*) FROM INFORMATION_SCHEMA.STATISTICS "
@@ -185,6 +195,72 @@ def run_migrations():
         if not _column_exists(conn, "users", "marriage_date"):
             logger.info("Adding users.marriage_date")
             conn.execute(text("ALTER TABLE users ADD COLUMN marriage_date DATE NULL"))
+            conn.commit()
+
+        # ── allowed_emails: new 2-column structure ────────────────────────
+        # Step 1 — make legacy email column nullable so new rows (no email) can insert
+        if _column_exists(conn, "allowed_emails", "email") and \
+                not _is_column_nullable(conn, "allowed_emails", "email"):
+            logger.info("Making allowed_emails.email nullable (legacy)")
+            conn.execute(text(
+                "ALTER TABLE allowed_emails MODIFY COLUMN email VARCHAR(255) NULL"
+            ))
+            conn.commit()
+
+        # Step 2 — employee_name
+        if not _column_exists(conn, "allowed_emails", "employee_name"):
+            logger.info("Adding allowed_emails.employee_name")
+            conn.execute(text(
+                "ALTER TABLE allowed_emails ADD COLUMN employee_name VARCHAR(255) NULL"
+            ))
+            conn.commit()
+
+        # Step 3 — outlook_email
+        if not _column_exists(conn, "allowed_emails", "outlook_email"):
+            logger.info("Adding allowed_emails.outlook_email")
+            conn.execute(text(
+                "ALTER TABLE allowed_emails ADD COLUMN outlook_email VARCHAR(255) NULL"
+            ))
+            conn.commit()
+
+        # Step 4 — gmail
+        if not _column_exists(conn, "allowed_emails", "gmail"):
+            logger.info("Adding allowed_emails.gmail")
+            conn.execute(text(
+                "ALTER TABLE allowed_emails ADD COLUMN gmail VARCHAR(255) NULL"
+            ))
+            conn.commit()
+
+        # Step 5 — migrate existing legacy email values into the right column
+        conn.execute(text(
+            "UPDATE allowed_emails "
+            "SET gmail = email "
+            "WHERE email LIKE '%@gmail.com' AND gmail IS NULL AND email IS NOT NULL"
+        ))
+        conn.execute(text(
+            "UPDATE allowed_emails "
+            "SET outlook_email = email "
+            "WHERE email NOT LIKE '%@gmail.com' AND outlook_email IS NULL AND email IS NOT NULL"
+        ))
+        # Fill employee_name from notes or a placeholder for rows that have none
+        conn.execute(text(
+            "UPDATE allowed_emails "
+            "SET employee_name = COALESCE(notes, email) "
+            "WHERE employee_name IS NULL"
+        ))
+        conn.commit()
+
+        # ── special_leave_credits.work_date ──────────────────────────────
+        if not _column_exists(conn, "special_leave_credits", "work_date"):
+            logger.info("Adding special_leave_credits.work_date")
+            conn.execute(text(
+                "ALTER TABLE special_leave_credits "
+                "ADD COLUMN work_date DATE NULL AFTER days"
+            ))
+            # Backfill existing rows: set work_date = earned_date as best approximation
+            conn.execute(text(
+                "UPDATE special_leave_credits SET work_date = earned_date WHERE work_date IS NULL"
+            ))
             conn.commit()
 
         logger.info("Schema migrations complete.")

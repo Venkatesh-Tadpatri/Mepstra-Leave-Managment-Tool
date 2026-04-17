@@ -75,14 +75,19 @@ def get_or_create_balance(user_id: int, year: int, db: Session) -> LeaveBalance:
 
 
 def get_special_leave_available(user_id: int, year: int, balance: LeaveBalance, db: Session) -> float:
-    """Return special leave days available to avail (earned >= 15 days ago) minus already used."""
+    """Return special leave days available to avail.
+    Only credits where work_date (actual day worked) is >= 15 days ago are eligible.
+    Falls back to earned_date for legacy rows without work_date.
+    """
     cutoff = date.today() - timedelta(days=15)
-    credits = db.query(SpecialLeaveCredit).filter(
+    all_credits = db.query(SpecialLeaveCredit).filter(
         SpecialLeaveCredit.user_id == user_id,
         SpecialLeaveCredit.year == year,
-        SpecialLeaveCredit.earned_date <= cutoff,
     ).all()
-    total_eligible = sum(c.days for c in credits)
+    total_eligible = sum(
+        c.days for c in all_credits
+        if (c.work_date or c.earned_date) <= cutoff
+    )
     available = max(0.0, total_eligible - balance.special_used)
     return available
 

@@ -36,7 +36,7 @@ export default function Header() {
         </motion.button>
 
         <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl border border-teal-100 bg-gradient-to-r from-teal-50 to-cyan-50">
-          <img src="/mepstra-logo.png" alt="Mepstra" className="h-6 w-auto object-contain" />
+          <img src="/mepstra-logo.png" alt="Mepstra" className="h-11 w-auto object-contain" />
           <div className="hidden sm:block leading-none">
             <p className="text-[11px] font-extrabold text-teal-700 leading-none">Mepstra</p>
             <p className="text-[9px] text-teal-500 leading-none mt-0.5">Leave Portal</p>
@@ -83,9 +83,17 @@ export default function Header() {
             onClick={() => setDropOpen(!dropOpen)}
             className="flex items-center gap-2.5 pl-2 pr-3 py-1.5 rounded-xl hover:bg-gray-50 border border-transparent hover:border-gray-200 transition-all"
           >
-            <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${gradient} flex items-center justify-center text-white text-sm font-bold shadow-md`}>
-              {user?.full_name?.[0]?.toUpperCase()}
-            </div>
+            {user?.profile_image ? (
+              <img
+                src={`http://localhost:8000${user.profile_image}`}
+                alt={user.full_name}
+                className="w-8 h-8 rounded-lg object-cover shadow-md"
+              />
+            ) : (
+              <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${gradient} flex items-center justify-center text-white text-sm font-bold shadow-md`}>
+                {user?.full_name?.[0]?.toUpperCase()}
+              </div>
+            )}
             <div className="hidden sm:block text-left">
               <p className="text-xs font-semibold text-gray-800 leading-tight">{user?.full_name?.split(" ")[0]}</p>
               <p className="text-xs text-gray-400 capitalize leading-tight">{user?.role?.replace(/_/g, " ")}</p>
@@ -103,9 +111,17 @@ export default function Header() {
               >
                 <div className={`p-4 bg-gradient-to-br ${gradient}`}>
                   <div className="flex items-center gap-3">
+                    {user?.profile_image ? (
+                      <img
+                        src={`http://localhost:8000${user.profile_image}`}
+                        alt={user.full_name}
+                        className="w-10 h-10 rounded-xl object-cover"
+                      />
+                    ) : (
                     <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center text-white font-bold">
                       {user?.full_name?.[0]?.toUpperCase()}
                     </div>
+                    )}
                     <div>
                       <p className="text-white text-sm font-semibold">{user?.full_name}</p>
                       <p className="text-white/70 text-xs">{user?.email}</p>

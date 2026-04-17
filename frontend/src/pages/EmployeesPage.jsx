@@ -45,7 +45,8 @@ export default function EmployeesPage() {
   const [togglingActiveId, setTogglingActiveId] = useState(null);
   const [confirmDialog, setConfirmDialog] = useState(null); // { user, action: "deactivate"|"activate" }
   const isAdmin = currentUser?.role === "admin";
-  const canToggleOverride = ["manager", "team_lead"].includes(currentUser?.role);
+  const canToggleEmployeeOverride = ["manager", "team_lead"].includes(currentUser?.role);
+  const canToggleManagerOverride = ["admin", "main_manager"].includes(currentUser?.role);
   const departmentFromQuery = searchParams.get("department") || "";
 
   async function load() {
@@ -57,7 +58,7 @@ export default function EmployeesPage() {
   }
 
   async function loadOverrides() {
-    if (!["manager", "team_lead"].includes(currentUser?.role)) return;
+    if (!["manager", "team_lead", "admin", "main_manager"].includes(currentUser?.role)) return;
     try {
       const res = await getTeamOverridesToday();
       setOverrideUserIds(new Set(res.data.user_ids));
@@ -228,9 +229,17 @@ export default function EmployeesPage() {
                     className={`border-b border-gray-100 transition-colors ${i % 2 === 0 ? "bg-white hover:bg-blue-50/30" : "bg-slate-50/70 hover:bg-blue-50/40"}`}>
                     <td className="px-4 py-3.5">
                       <div className="flex items-center gap-3">
-                        <div className={`w-9 h-9 bg-gradient-to-br ${avatarColor} rounded-xl flex items-center justify-center text-white text-xs font-bold shadow-sm flex-shrink-0`}>
-                          {u.full_name[0].toUpperCase()}
-                        </div>
+                        {u.profile_image ? (
+                          <img
+                            src={`http://localhost:8000${u.profile_image}`}
+                            alt={u.full_name}
+                            className="w-9 h-9 rounded-xl object-cover shadow-sm flex-shrink-0"
+                          />
+                        ) : (
+                          <div className={`w-9 h-9 bg-gradient-to-br ${avatarColor} rounded-xl flex items-center justify-center text-white text-xs font-bold shadow-sm flex-shrink-0`}>
+                            {u.full_name[0].toUpperCase()}
+                          </div>
+                        )}
                         <div>
                           <p className="font-semibold text-gray-900">{u.full_name}</p>
                           <p className="text-xs text-gray-400">{u.email}</p>
@@ -253,27 +262,34 @@ export default function EmployeesPage() {
                       </span>
                     </td>
                     <td className="px-4 py-3.5">
-                      <div className="flex items-center gap-1.5 flex-nowrap">
-                        {/* Override toggle — manager / team_lead only, for employees */}
-                        {canToggleOverride && u.role === "employee" && (() => {
-                          const isOn = overrideUserIds.has(u.id);
-                          const busy = overrideLoadingUserId === u.id;
-                          return (
-                            <button
-                              onClick={() => handleToggleOverride(u.id, isOn)}
-                              disabled={busy}
-                              title={isOn ? "Disable backdated leave override" : "Enable backdated leave override"}
-                              className="flex items-center gap-2 disabled:opacity-60">
-                              {/* toggle track */}
-                              <span className={`relative inline-flex h-5 w-9 flex-shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${isOn ? "bg-amber-500" : "bg-gray-200"}`}>
-                                <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition-transform duration-200 ease-in-out ${isOn ? "translate-x-4" : "translate-x-0"}`} />
-                              </span>
-                              <span className={`text-xs font-semibold whitespace-nowrap ${isOn ? "text-amber-600" : "text-gray-400"}`}>
-                                {busy ? "..." : isOn ? "Override On" : "Override Off"}
-                              </span>
-                            </button>
-                          );
-                        })()}
+                      <div className="flex items-center gap-2">
+                        {/* Override slot — fixed width so Deactivate/Reset PIN always align */}
+                        {(canToggleEmployeeOverride || canToggleManagerOverride) && (
+                          <div className="w-32 flex-shrink-0">
+                            {((canToggleEmployeeOverride && u.role === "employee") ||
+                              (canToggleManagerOverride && (u.role === "manager" || u.role === "hr"))) ? (() => {
+                              const isOn = overrideUserIds.has(u.id);
+                              const busy = overrideLoadingUserId === u.id;
+                              const isManagerOverride = u.role === "manager" || u.role === "hr";
+                              return (
+                                <button
+                                  onClick={() => handleToggleOverride(u.id, isOn)}
+                                  disabled={busy}
+                                  title={isOn ? "Disable emergency leave override" : "Enable emergency leave override"}
+                                  className="flex items-center gap-2 disabled:opacity-60">
+                                  <span className={`relative inline-flex h-5 w-9 flex-shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${isOn ? (isManagerOverride ? "bg-purple-500" : "bg-amber-500") : "bg-gray-200"}`}>
+                                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition-transform duration-200 ease-in-out ${isOn ? "translate-x-4" : "translate-x-0"}`} />
+                                  </span>
+                                  <span className={`text-xs font-semibold whitespace-nowrap ${isOn ? (isManagerOverride ? "text-purple-600" : "text-amber-600") : "text-gray-400"}`}>
+                                    {busy ? "..." : isOn ? "Override On" : "Override Off"}
+                                  </span>
+                                </button>
+                              );
+                            })() : (
+                              <span className="text-gray-300 text-sm select-none pl-1">—</span>
+                            )}
+                          </div>
+                        )}
 
                         {isAdmin && (
                           <>
