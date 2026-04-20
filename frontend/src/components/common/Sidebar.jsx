@@ -4,21 +4,22 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   MdDashboard, MdEventNote, MdAddCircleOutline, MdPendingActions,
   MdCalendarMonth, MdHolidayVillage, MdPeople, MdAccountBalance, MdPerson,
-  MdEditCalendar, MdShield
+  MdEditCalendar, MdShield, MdHomeWork
 } from "react-icons/md";
 
 const navItems = [
-  { to: "/dashboard",   icon: MdDashboard,        label: "Dashboard",   roles: ["all"],                                                          color: "from-blue-500 to-cyan-400" },
-  { to: "/leaves",      icon: MdEventNote,        label: "My Leaves",   roles: ["manager","hr"],                                                 color: "from-indigo-500 to-blue-400" },
-  { to: "/leaves/apply",icon: MdAddCircleOutline,  label: "Apply Leave", roles: ["employee","team_lead","manager","hr"],                          color: "from-green-500 to-emerald-400" },
-  { to: "/approvals",   icon: MdPendingActions,    label: "Approvals",   roles: ["employee","team_lead","manager","main_manager","admin","hr"],  color: "from-orange-500 to-amber-400" },
-  { to: "/calendar",    icon: MdCalendarMonth,     label: "Calendar",    roles: ["all"],                                                          color: "from-pink-500 to-rose-400" },
-  { to: "/holidays",    icon: MdHolidayVillage,    label: "Holidays",    roles: ["all"],                                                          color: "from-indigo-500 to-blue-400" },
-  { to: "/holidays/update", icon: MdEditCalendar,  label: "Update Holidays", roles: ["admin","main_manager","hr"],                               color: "from-violet-500 to-purple-400" },
-  { to: "/employees",   icon: MdPeople,            label: "Employees",   roles: ["admin","main_manager","manager","hr"],                          color: "from-teal-500 to-cyan-400" },
-  { to: "/departments",    icon: MdAccountBalance, label: "Departments",      roles: ["admin","main_manager"],                                    color: "from-red-500 to-pink-400" },
-  { to: "/allowed-emails", icon: MdShield,         label: "Email Whitelist",  roles: ["admin", "hr"],                                             color: "from-emerald-500 to-green-400" },
-  { to: "/profile",        icon: MdPerson,         label: "Profile",          roles: ["all"],                                                     color: "from-slate-500 to-gray-400" },
+  { to: "/dashboard",       icon: MdDashboard,        label: "Dashboard",        roles: ["all"],                                                        color: "from-blue-500 to-cyan-400",     end: true },
+  { to: "/leaves",          icon: MdEventNote,        label: "My Leaves",        roles: ["manager","hr"],                                               color: "from-indigo-500 to-blue-400",   end: true },
+  { to: "/leaves/apply",    icon: MdAddCircleOutline,  label: "Apply Leave",     roles: ["employee","team_lead","manager","hr"],                         color: "from-green-500 to-emerald-400", end: true },
+  { to: "/wfh",             icon: MdHomeWork,          label: "Work From Home",  roles: ["employee","team_lead","manager","hr"],                         color: "from-sky-500 to-cyan-400",      end: true },
+  { to: "/approvals",       icon: MdPendingActions,    label: "Approvals",       roles: ["employee","team_lead","manager","main_manager","admin","hr"],  color: "from-orange-500 to-amber-400",  end: true },
+  { to: "/calendar",        icon: MdCalendarMonth,     label: "Calendar",        roles: ["all"],                                                        color: "from-pink-500 to-rose-400",     end: true },
+  { to: "/holidays",        icon: MdHolidayVillage,    label: "Holidays",        roles: ["all"],                                                        color: "from-indigo-500 to-blue-400",   end: true },
+  { to: "/holidays/update", icon: MdEditCalendar,      label: "Update Holidays", roles: ["admin","main_manager","hr"],                                  color: "from-violet-500 to-purple-400", end: true },
+  { to: "/employees",       icon: MdPeople,            label: "Employees",       roles: ["admin","main_manager","manager","hr"],                         color: "from-teal-500 to-cyan-400",     end: true },
+  { to: "/departments",     icon: MdAccountBalance,    label: "Departments",     roles: ["admin","main_manager"],                                        color: "from-red-500 to-pink-400",      end: true },
+  { to: "/allowed-emails",  icon: MdShield,            label: "Email Whitelist", roles: ["admin", "hr"],                                                color: "from-emerald-500 to-green-400", end: true },
+  { to: "/profile",         icon: MdPerson,            label: "Profile",         roles: ["all"],                                                        color: "from-slate-500 to-gray-400",    end: true },
 ];
 
 export default function Sidebar() {
@@ -32,7 +33,7 @@ export default function Sidebar() {
 
   return (
     <motion.aside
-      animate={{ width: sidebarOpen ? 256 : 72 }}
+      animate={{ width: sidebarOpen ? 210 : 68 }}
       transition={{ duration: 0.3, ease: "easeInOut" }}
       className="fixed left-0 top-0 h-full z-30 overflow-hidden"
       style={{ background: "linear-gradient(180deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%)" }}
@@ -60,8 +61,8 @@ export default function Sidebar() {
 
       {/* Nav */}
       <nav className="mt-3 px-2 space-y-0.5">
-        {visible.map(({ to, icon: Icon, label, color }) => (
-          <NavLink key={to} to={to}>
+        {visible.map(({ to, icon: Icon, label, color, end }) => (
+          <NavLink key={to} to={to} end={end}>
             {({ isActive }) => (
               <motion.div
                 whileHover={{ x: 4 }}

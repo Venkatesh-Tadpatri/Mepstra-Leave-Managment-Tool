@@ -12,11 +12,13 @@ const fadeUp = { hidden: { opacity: 0, y: 16 }, show: { opacity: 1, y: 0, transi
 const stagger = { show: { transition: { staggerChildren: 0.06 } } };
 
 const EMPTY_FORM = { employee_name: "", outlook_email: "", gmail: "", notes: "" };
+const EMPTY_ERRORS = { outlook_email: "", gmail: "" };
 
 export default function AllowedEmailsPage() {
   const [emails, setEmails] = useState([]);
   const [search, setSearch] = useState("");
   const [adding, setAdding] = useState(false);
+  const [formErrors, setFormErrors] = useState(EMPTY_ERRORS);
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({});
   const [loading, setLoading] = useState(false);
@@ -37,20 +39,36 @@ export default function AllowedEmailsPage() {
 
   async function handleAdd(e) {
     e.preventDefault();
-    if (!form.outlook_email && !form.gmail) {
-      toast.error("Enter at least one email (Outlook or Gmail)");
+    const errs = { outlook_email: "", gmail: "" };
+    const outlook = form.outlook_email.trim().toLowerCase();
+    const gmail = form.gmail.trim().toLowerCase();
+
+    if (!outlook && !gmail) {
+      toast.error("Enter at least one email");
       return;
     }
+    if (outlook && !outlook.endsWith("@mepstra.com")) {
+      errs.outlook_email = "Must be a @mepstra.com email address";
+    }
+    if (outlook && gmail && outlook === gmail) {
+      errs.gmail = "Office email must be different from the Outlook email";
+    }
+    if (errs.outlook_email || errs.gmail) {
+      setFormErrors(errs);
+      return;
+    }
+    setFormErrors(EMPTY_ERRORS);
     setLoading(true);
     try {
       await addAllowedEmail({
         employee_name: form.employee_name.trim(),
-        outlook_email: form.outlook_email.trim().toLowerCase() || undefined,
-        gmail: form.gmail.trim().toLowerCase() || undefined,
+        outlook_email: outlook || undefined,
+        gmail: gmail || undefined,
         notes: form.notes.trim() || undefined,
       });
       toast.success("Employee added to whitelist");
       setForm(EMPTY_FORM);
+      setFormErrors(EMPTY_ERRORS);
       setAdding(false);
       load();
     } catch (err) {
@@ -136,8 +154,8 @@ export default function AllowedEmailsPage() {
         <div>
           <p className="font-semibold">How the whitelist works</p>
           <p className="text-blue-700 mt-0.5">
-            Each employee gets one row with their Outlook and/or Gmail. They can register using either email,
-            but only once. If they register with Outlook, their Gmail is automatically blocked and vice versa.
+            Each employee gets one row with their Outlook and/or Office email. They can register using either email,
+            but only once. If they register with Outlook, their Office email is automatically blocked and vice versa.
           </p>
         </div>
       </motion.div>
@@ -170,7 +188,7 @@ export default function AllowedEmailsPage() {
                   <span className="flex items-center gap-1.5"><MdEmail className="text-blue-600" /> Outlook Email</span>
                 </th>
                 <th className="px-4 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                  <span className="flex items-center gap-1.5"><SiGmail className="text-red-500" /> Gmail</span>
+                  <span className="flex items-center gap-1.5"><SiGmail className="text-red-500" /> Office Email</span>
                 </th>
                 <th className="px-4 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Notes</th>
                 <th className="px-4 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Added On</th>
@@ -183,7 +201,7 @@ export default function AllowedEmailsPage() {
                   key={entry.id}
                   initial={{ opacity: 0 }} animate={{ opacity: 1 }}
                   transition={{ delay: i * 0.03 }}
-                  className="border-b border-gray-50 hover:bg-blue-50/20 transition-colors"
+                  className={`border-b border-gray-100 transition-colors ${i % 2 === 0 ? "bg-white hover:bg-blue-50/30" : "bg-slate-50/60 hover:bg-blue-50/40"}`}
                 >
                   <td className="px-4 py-3 text-gray-300 font-mono text-xs">{i + 1}</td>
 
@@ -334,7 +352,7 @@ export default function AllowedEmailsPage() {
         {adding && (
           <>
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              onClick={() => setAdding(false)}
+              onClick={() => { setAdding(false); setFormErrors(EMPTY_ERRORS); }}
               className="fixed inset-0 bg-black/30 backdrop-blur-sm z-40" />
             <motion.div
               initial={{ x: "100%" }} animate={{ x: 0 }} exit={{ x: "100%" }}
@@ -389,30 +407,34 @@ export default function AllowedEmailsPage() {
                     <input
                       type="email"
                       value={form.outlook_email}
-                      onChange={(e) => setForm((f) => ({ ...f, outlook_email: e.target.value }))}
+                      onChange={(e) => { setForm((f) => ({ ...f, outlook_email: e.target.value })); setFormErrors((er) => ({ ...er, outlook_email: "" })); }}
                       placeholder="employee@mepstra.com"
-                      className="input-field text-sm pl-9"
+                      className={`input-field text-sm pl-9 ${formErrors.outlook_email ? "border-red-400 focus:border-red-400" : ""}`}
                     />
                   </div>
+                  {formErrors.outlook_email && <p className="text-xs text-red-500 mt-1">{formErrors.outlook_email}</p>}
+                  <p className="text-[10px] text-gray-400 mt-1">Only <span className="font-semibold text-blue-600">@mepstra.com</span> emails allowed</p>
                 </div>
 
-                {/* Gmail */}
+                {/* Office Email */}
                 <div>
                   <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5 flex items-center gap-1.5">
-                    <SiGmail className="text-red-500" /> Gmail
+                    <MdEmail className="text-gray-500" /> Office Email
                     <span className="font-normal text-gray-400 normal-case ml-1">(optional)</span>
                   </label>
                   <div className="relative">
-                    <SiGmail className="absolute left-3 top-1/2 -translate-y-1/2 text-red-500 text-sm" />
+                    <MdEmail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm" />
                     <input
                       type="email"
                       value={form.gmail}
-                      onChange={(e) => setForm((f) => ({ ...f, gmail: e.target.value }))}
+                      onChange={(e) => { setForm((f) => ({ ...f, gmail: e.target.value })); setFormErrors((er) => ({ ...er, gmail: "" })); }}
                       placeholder="employee@gmail.com"
-                      className="input-field text-sm pl-9"
+                      className={`input-field text-sm pl-9 ${formErrors.gmail ? "border-red-400 focus:border-red-400" : ""}`}
                     />
                   </div>
-                  <p className="text-[10px] text-gray-400 mt-1">Employee can register with either email, but only once.</p>
+                  {formErrors.gmail && <p className="text-xs text-red-500 mt-1">{formErrors.gmail}</p>}
+                  <p className="text-[10px] text-gray-400 mt-1">Any email accepted. Must be different from Outlook email.</p>
+
                 </div>
 
                 {/* Notes */}

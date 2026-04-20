@@ -1,5 +1,7 @@
-from datetime import date
+import json
 import logging
+from datetime import date
+from pathlib import Path
 
 from app.core.security import get_password_hash
 from app.db.database import SessionLocal
@@ -16,32 +18,32 @@ from app.models.models import (
 
 logger = logging.getLogger(__name__)
 
-ALLOWED_DEPARTMENTS = {
-    BusinessUnit.MEPSTRA_POWER_SOLUTIONS: [
-        ("Sales Team", "Sales department"),
-        ("Service Team", "Service department"),
-        ("Plant Team", "Factory department"),
-        ("HR/Admin", "HR and Administration team"),
-    ],
-    BusinessUnit.MEPSTRA_ENGINEERING_CONSULTANCY: [
-        ("Mechanical Engineering", "Mechanical engineering department"),
-        ("Electrical Engineering", "Electrical engineering department"),
-        ("Software", "Software department"),
-        ("HR/Admin", "HR and Administration team"),
-    ],
+_DATA_FILE = Path(__file__).parent / "seed_data.json"
+
+_BUSINESS_UNIT_MAP = {
+    "MEPSTRA_POWER_SOLUTIONS": BusinessUnit.MEPSTRA_POWER_SOLUTIONS,
+    "MEPSTRA_ENGINEERING_CONSULTANCY": BusinessUnit.MEPSTRA_ENGINEERING_CONSULTANCY,
 }
 
+_ROLE_MAP = {
+    "ADMIN": UserRole.ADMIN,
+    "HR": UserRole.HR,
+    "MAIN_MANAGER": UserRole.MAIN_MANAGER,
+    "MANAGER": UserRole.MANAGER,
+    "TEAM_LEAD": UserRole.TEAM_LEAD,
+    "EMPLOYEE": UserRole.EMPLOYEE,
+}
 
-def _email_variants(email: str) -> list[str]:
-    normalized = email.lower().strip()
-    variants = [normalized]
+_EMPLOYMENT_MAP = {
+    "PERMANENT": EmploymentType.PERMANENT,
+    "INTERN": EmploymentType.INTERN,
+    "CONTRACT": EmploymentType.CONTRACT,
+}
 
-    if normalized.endswith("@mepstra.com"):
-        variants.append(normalized.replace("@mepstra.com", "@mepstra.com"))
-    elif normalized.endswith("@mepstra.com"):
-        variants.append(normalized.replace("@mepstra.com", "@mepstra.com"))
-
-    return list(dict.fromkeys(variants))
+_HOLIDAY_TYPE_MAP = {
+    "MANDATORY": HolidayType.MANDATORY,
+    "OPTIONAL": HolidayType.OPTIONAL,
+}
 
 
 def _get_or_create_department(db, name: str, business_unit: BusinessUnit, description: str) -> Department:
@@ -60,207 +62,122 @@ def _get_or_create_department(db, name: str, business_unit: BusinessUnit, descri
     return department
 
 
-def _get_or_create_demo_user(db, email: str, defaults: dict) -> User:
-    user = None
-    for variant in _email_variants(email):
-        user = db.query(User).filter(User.email == variant).first()
-        if user:
-            break
-
+def _get_or_create_user(db, email: str, defaults: dict) -> User:
+    user = db.query(User).filter(User.email == email.lower().strip()).first()
     if not user:
         user = User(email=email.lower().strip(), **defaults)
         db.add(user)
     else:
-        user.email = email.lower().strip()
         for field, value in defaults.items():
             setattr(user, field, value)
-
     db.commit()
     db.refresh(user)
     return user
 
 
-def _sync_allowed_departments(db) -> dict[tuple[str, BusinessUnit], Department]:
+def _sync_departments(db, dept_data: list) -> dict[tuple[str, BusinessUnit], Department]:
     departments = {}
-    for business_unit, items in ALLOWED_DEPARTMENTS.items():
-        for name, description in items:
-            department = _get_or_create_department(db, name, business_unit, description)
-            departments[(name, business_unit)] = department
+    for item in dept_data:
+        bu = _BUSINESS_UNIT_MAP[item["business_unit"]]
+        dept = _get_or_create_department(db, item["name"], bu, item["description"])
+        departments[(item["name"], bu)] = dept
+
+    allowed_ids = {d.id for d in departments.values()}
+    for extra in db.query(Department).filter(~Department.id.in_(allowed_ids)).all():
+        db.delete(extra)
+    db.commit()
     return departments
 
 
-def _guess_business_unit(user: User, current_department_name: str | None) -> BusinessUnit:
-    if user.business_unit:
-        return user.business_unit
-    if current_department_name in {"Sales Team", "Service Team", "Plant Team"}:
-        return BusinessUnit.MEPSTRA_POWER_SOLUTIONS
-    return BusinessUnit.MEPSTRA_ENGINEERING_CONSULTANCY
-
-
-def _target_department_name(user: User, current_department_name: str | None, business_unit: BusinessUnit) -> str:
-    current = (current_department_name or "").lower()
-
-    if business_unit == BusinessUnit.MEPSTRA_POWER_SOLUTIONS:
-        if "sales" in current:
-            return "Sales Team"
-        if "service" in current:
-            return "Service Team"
-        if "plant" in current or "factory" in current:
-            return "Plant Team"
-        if "hr" in current:
-            return "HR/Admin"
-        if user.role == UserRole.HR:
-            return "HR/Admin"
-        if user.role == UserRole.MANAGER:
-            return "Sales Team"
-        return "Plant Team"
-
-    if "mechanical" in current:
-        return "Mechanical Engineering"
-    if "electrical" in current:
-        return "Electrical Engineering"
-    if "software" in current:
-        return "Software"
-    if "hr" in current:
-        return "HR/Admin"
-    if user.role == UserRole.HR:
-        return "HR/Admin"
-    if user.role in (UserRole.ADMIN, UserRole.MAIN_MANAGER):
-        return "Mechanical Engineering"
-    return "Software"
-
-
-def _remap_users_to_allowed_departments(db, departments: dict[tuple[str, BusinessUnit], Department]) -> None:
-    all_departments = {department.id: department for department in db.query(Department).all()}
+def _remap_users_to_departments(db, departments: dict[tuple[str, BusinessUnit], Department]) -> None:
+    dept_by_id = {d.id: d for d in db.query(Department).all()}
     for user in db.query(User).all():
-        current_department = all_departments.get(user.department_id)
-        current_department_name = current_department.name if current_department else None
-        business_unit = _guess_business_unit(user, current_department_name)
-        user.business_unit = business_unit
-        target_department_name = _target_department_name(user, current_department_name, business_unit)
-        user.department_id = departments[(target_department_name, business_unit)].id
+        current = dept_by_id.get(user.department_id)
+        current_name = current.name if current else None
+        bu = user.business_unit or BusinessUnit.MEPSTRA_ENGINEERING_CONSULTANCY
+        matched = next(
+            (dept for (name, unit), dept in departments.items() if unit == bu and name == current_name),
+            None,
+        )
+        if matched:
+            user.department_id = matched.id
+            user.business_unit = bu
     db.commit()
 
 
-def _delete_extra_departments(db, departments: dict[tuple[str, BusinessUnit], Department]) -> None:
-    allowed_ids = {department.id for department in departments.values()}
-    extras = db.query(Department).filter(~Department.id.in_(allowed_ids)).all()
-    for department in extras:
-        db.delete(department)
+def _seed_users(db, user_data: list, departments: dict[tuple[str, BusinessUnit], Department]) -> dict[str, User]:
+    # First pass: create users without relationships
+    user_objects: dict[str, User] = {}
+    for item in user_data:
+        bu = _BUSINESS_UNIT_MAP[item["business_unit"]]
+        dept = departments.get((item["department"], bu))
+        defaults = {
+            "full_name": item["full_name"],
+            "hashed_password": get_password_hash(item["password"]),
+            "role": _ROLE_MAP[item["role"]],
+            "employment_type": _EMPLOYMENT_MAP[item["employment_type"]],
+            "business_unit": bu,
+            "department_id": dept.id if dept else None,
+            "joining_date": date.fromisoformat(item["joining_date"]),
+            "is_active": True,
+        }
+        user = _get_or_create_user(db, item["email"], defaults)
+        user_objects[item["email"]] = user
+
+    # Second pass: wire up manager/hr references
+    for item in user_data:
+        user = user_objects[item["email"]]
+        changed = False
+        if item.get("manager") and item["manager"] in user_objects:
+            user.manager_id = user_objects[item["manager"]].id
+            changed = True
+        if item.get("hr") and item["hr"] in user_objects:
+            user.hr_id = user_objects[item["hr"]].id
+            changed = True
+        if changed:
+            db.commit()
+            db.refresh(user)
+
+    return user_objects
+
+
+def _seed_holidays(db, holiday_data: list) -> None:
+    for item in holiday_data:
+        hdate = date.fromisoformat(item["date"])
+        exists = db.query(Holiday).filter(Holiday.date == hdate).first()
+        if not exists:
+            db.add(Holiday(
+                name=item["name"],
+                date=hdate,
+                holiday_type=_HOLIDAY_TYPE_MAP[item["type"]],
+                year=item["year"],
+            ))
     db.commit()
 
 
 def seed_data():
+    data = json.loads(_DATA_FILE.read_text(encoding="utf-8"))
     db = SessionLocal()
     try:
-        departments = _sync_allowed_departments(db)
-        _remap_users_to_allowed_departments(db, departments)
-        _delete_extra_departments(db, departments)
+        departments = _sync_departments(db, data["departments"])
+        _remap_users_to_departments(db, departments)
+        users = _seed_users(db, data["users"], departments)
 
-        mechanical_dept = departments[("Mechanical Engineering", BusinessUnit.MEPSTRA_ENGINEERING_CONSULTANCY)]
-        software_dept = departments[("Software", BusinessUnit.MEPSTRA_ENGINEERING_CONSULTANCY)]
-        hradmin_consultancy = departments[("HR/Admin", BusinessUnit.MEPSTRA_ENGINEERING_CONSULTANCY)]
-        sales_dept = departments[("Sales Team", BusinessUnit.MEPSTRA_POWER_SOLUTIONS)]
-        plant_dept = departments[("Plant Team", BusinessUnit.MEPSTRA_POWER_SOLUTIONS)]
-
-        admin = _get_or_create_demo_user(db, "admin@mepstra.com", {
-            "full_name": "Deepak Dixith",
-            "hashed_password": get_password_hash("1234"),
-            "role": UserRole.ADMIN,
-            "employment_type": EmploymentType.PERMANENT,
-            "business_unit": BusinessUnit.MEPSTRA_ENGINEERING_CONSULTANCY,
-            "department_id": mechanical_dept.id,
-            "joining_date": date(2020, 1, 1),
-            "is_active": True,
-        })
-
-
-        hr_user = _get_or_create_demo_user(db, "hr@mepstra.com", {
-            "full_name": "Kavya Reddy",
-            "hashed_password": get_password_hash("1234"),
-            "role": UserRole.HR,
-            "employment_type": EmploymentType.PERMANENT,
-            "business_unit": BusinessUnit.MEPSTRA_ENGINEERING_CONSULTANCY,
-            "department_id": hradmin_consultancy.id,
-            "joining_date": date(2020, 3, 1),
-            "is_active": True,
-        })
-
-        main_mgr = _get_or_create_demo_user(db, "mainmanager@mepstra.com", {
-            "full_name": "Srinivas Rao",
-            "hashed_password": get_password_hash("1234"),
-            "role": UserRole.MAIN_MANAGER,
-            "employment_type": EmploymentType.PERMANENT,
-            "business_unit": BusinessUnit.MEPSTRA_ENGINEERING_CONSULTANCY,
-            "department_id": mechanical_dept.id,
-            "joining_date": date(2020, 2, 1),
-            "hr_id": hr_user.id,
-            "is_active": True,
-        })
-
-        manager = _get_or_create_demo_user(db, "manager@mepstra.com", {
-            "full_name": "Rahul Varma",
-            "hashed_password": get_password_hash("1234"),
-            "role": UserRole.MANAGER,
-            "employment_type": EmploymentType.PERMANENT,
-            "business_unit": BusinessUnit.MEPSTRA_POWER_SOLUTIONS,
-            "department_id": sales_dept.id,
-            "joining_date": date(2021, 6, 15),
-            "manager_id": admin.id,
-            "hr_id": hr_user.id,
-            "is_active": True,
-        })
-
-        employee = _get_or_create_demo_user(db, "employee@mepstra.com", {
-            "full_name": "Ananya Sharma",
-            "hashed_password": get_password_hash("1234"),
-            "role": UserRole.EMPLOYEE,
-            "employment_type": EmploymentType.PERMANENT,
-            "business_unit": BusinessUnit.MEPSTRA_POWER_SOLUTIONS,
-            "department_id": plant_dept.id,
-            "joining_date": date(2023, 1, 10),
-            "manager_id": manager.id,
-            "hr_id": hr_user.id,
-            "is_active": True,
-        })
-
-        for user in [admin, main_mgr, hr_user, manager, employee]:
+        for user in users.values():
             balance = db.query(LeaveBalance).filter(
                 LeaveBalance.user_id == user.id,
                 LeaveBalance.year == date.today().year,
             ).first()
             if not balance:
                 db.add(LeaveBalance(user_id=user.id, year=date.today().year))
-
-        holidays_2026 = [
-            ("New Year's Day", date(2026, 1, 1)),
-            ("Republic Day", date(2026, 1, 26)),
-            ("Holi", date(2026, 3, 3)),
-            ("Gandhi Jayanti", date(2026, 10, 2)),
-            ("Christmas", date(2026, 12, 25)),
-        ]
-        for name, hdate in holidays_2026:
-            exists = db.query(Holiday).filter(Holiday.date == hdate).first()
-            if not exists:
-                db.add(Holiday(name=name, date=hdate, holiday_type=HolidayType.MANDATORY, year=2026))
-
-        optional_holidays = [
-            ("Ugadi", date(2026, 3, 19)),
-            ("Pongal", date(2026, 1, 14)),
-        ]
-        for name, hdate in optional_holidays:
-            exists = db.query(Holiday).filter(Holiday.date == hdate).first()
-            if not exists:
-                db.add(Holiday(name=name, date=hdate, holiday_type=HolidayType.OPTIONAL, year=2026))
-
         db.commit()
-        logger.info("Seed data ensured successfully")
-        print("\n=== DEPARTMENTS SYNCED ===")
-        print("Mepstra Power Solutions: Sales Team, Service Team, Plant Team, HR/Admin")
-        print("Mepstra Engineering Consultancy: Mechanical Engineering, Electrical Engineering, Software, HR/Admin")
-        print("================================\n")
+
+        _seed_holidays(db, data["holidays"])
+
+        logger.info("Seed data loaded from seed_data.json successfully")
     except Exception as e:
         db.rollback()
         logger.error("Seed failed: %s", e)
+        raise
     finally:
         db.close()

@@ -35,19 +35,15 @@ export default function Header() {
           <MdMenu className="text-xl" />
         </motion.button>
 
-        <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl border border-teal-100 bg-gradient-to-r from-teal-50 to-cyan-50">
+        <div className="flex items-center px-2 py-1.5 rounded-xl border border-teal-100 bg-gradient-to-r from-teal-50 to-cyan-50">
           <img src="/mepstra-logo.png" alt="Mepstra" className="h-11 w-auto object-contain" />
-          <div className="hidden sm:block leading-none">
-            <p className="text-[11px] font-extrabold text-teal-700 leading-none">Mepstra</p>
-            <p className="text-[9px] text-teal-500 leading-none mt-0.5">Leave Portal</p>
-          </div>
         </div>
 
         <div className="hidden md:block h-6 w-px bg-gray-200" />
 
         <div className="hidden md:block">
           <p className="text-sm font-bold text-gray-900 flex items-center gap-1">
-            Welcome, {user?.full_name?.split(" ")[0]}
+            Welcome, {user?.full_name}
             <motion.span animate={{ rotate: [0, 20, -10, 20, 0] }} transition={{ delay: 0.5, duration: 0.8 }}>
               👋
             </motion.span>
@@ -94,8 +90,8 @@ export default function Header() {
                 {user?.full_name?.[0]?.toUpperCase()}
               </div>
             )}
-            <div className="hidden sm:block text-left">
-              <p className="text-xs font-semibold text-gray-800 leading-tight">{user?.full_name?.split(" ")[0]}</p>
+            <div className="hidden sm:block text-left max-w-[120px]">
+              <p className="text-xs font-semibold text-gray-800 leading-tight truncate">{user?.full_name}</p>
               <p className="text-xs text-gray-400 capitalize leading-tight">{user?.role?.replace(/_/g, " ")}</p>
             </div>
           </motion.button>
@@ -107,7 +103,7 @@ export default function Header() {
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: -8, scale: 0.95 }}
                 transition={{ duration: 0.15 }}
-                className="absolute right-0 top-12 w-52 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden z-50"
+                className="absolute right-0 top-12 w-72 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden z-50"
               >
                 <div className={`p-4 bg-gradient-to-br ${gradient}`}>
                   <div className="flex items-center gap-3">
@@ -122,9 +118,9 @@ export default function Header() {
                       {user?.full_name?.[0]?.toUpperCase()}
                     </div>
                     )}
-                    <div>
-                      <p className="text-white text-sm font-semibold">{user?.full_name}</p>
-                      <p className="text-white/70 text-xs">{user?.email}</p>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-white text-sm font-semibold truncate">{user?.full_name}</p>
+                      <p className="text-white/70 text-xs break-all leading-snug mt-0.5">{user?.email}</p>
                     </div>
                   </div>
                 </div>

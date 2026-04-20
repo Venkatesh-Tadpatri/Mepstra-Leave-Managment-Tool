@@ -8,7 +8,7 @@ import {
 import toast from "react-hot-toast";
 import { getDashboardStats, getEmployeeLeaveReport, getMyStats, getOnLeaveToday, getLeaveSchedule, getDepartments, getWFHToday } from "../services/api";
 import {
-  MdPeople, MdPendingActions, MdCheckCircle, MdPersonOff,
+  MdPeople, MdPendingActions, MdPersonOff,
   MdEventNote, MdCalendarMonth, MdArrowForward,
   MdFileDownload, MdPictureAsPdf, MdClose, MdBeachAccess, MdLaptop
 } from "react-icons/md";
@@ -463,7 +463,7 @@ export default function DashboardPage() {
         <motion.div variants={stagger} className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard icon={MdPeople}        label="Total Employees"  value={stats.total_employees}  gradient="linear-gradient(135deg,#667eea,#764ba2)" onClick={() => navigate("/employees")} />
           <StatCard icon={MdPendingActions} label="Pending Requests" value={stats.pending_requests} gradient="linear-gradient(135deg,#f093fb,#f5576c)" onClick={() => navigate("/approvals")} />
-          <StatCard icon={MdCheckCircle}   label="Approved Today"   value={stats.approved_today}   gradient="linear-gradient(135deg,#4facfe,#00f2fe)" />
+          <StatCard icon={MdLaptop}         label="WFH Today"        value={todayWFH.length}        gradient="linear-gradient(135deg,#4facfe,#00f2fe)" />
           <StatCard icon={MdPersonOff}     label="On Leave Today"   value={stats.on_leave_today}   gradient="linear-gradient(135deg,#43e97b,#38f9d7)" onClick={handleOnLeaveTodayClick} />
         </motion.div>
       )}
@@ -501,7 +501,7 @@ export default function DashboardPage() {
                 </thead>
                 <tbody>
                   {todayOnLeave.map((e, i) => (
-                    <tr key={e.id} className={`border-b border-gray-50 ${i % 2 === 0 ? "" : "bg-gray-50/50"}`}>
+                    <tr key={e.id} className={`border-b border-gray-100 transition-colors ${i % 2 === 0 ? "bg-white hover:bg-blue-50/30" : "bg-slate-50/60 hover:bg-blue-50/40"}`}>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
                           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center text-white font-bold text-xs flex-shrink-0">
@@ -559,7 +559,7 @@ export default function DashboardPage() {
                 </thead>
                 <tbody>
                   {todayWFH.map((e, i) => (
-                    <tr key={e.id} className={`border-b border-gray-50 ${i % 2 === 0 ? "" : "bg-gray-50/50"}`}>
+                    <tr key={e.id} className={`border-b border-gray-100 transition-colors ${i % 2 === 0 ? "bg-white hover:bg-blue-50/30" : "bg-slate-50/60 hover:bg-blue-50/40"}`}>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
                           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-400 to-violet-500 flex items-center justify-center text-white font-bold text-xs flex-shrink-0">
@@ -660,14 +660,14 @@ export default function DashboardPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-100">
-                    {["#", "Employee", "Department", "Leave Type", "From", "To", "Days", "Status"].map((h) => (
+                    {["#", "Employee", "Department", "Leave Type", "From", "To", "Days", "Status", "Approved By", "Approved On"].map((h) => (
                       <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {schedule.map((e, i) => (
-                    <tr key={e.id} className={`border-b border-gray-50 hover:bg-violet-50/30 transition-colors ${i % 2 === 0 ? "" : "bg-gray-50/40"}`}>
+                    <tr key={e.id} className={`border-b border-gray-100 transition-colors ${i % 2 === 0 ? "bg-white hover:bg-violet-50/30" : "bg-slate-50/60 hover:bg-violet-50/40"}`}>
                       <td className="px-4 py-3 text-gray-300 font-mono text-xs">{i + 1}</td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
@@ -689,6 +689,32 @@ export default function DashboardPage() {
                           <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
                           {e.status.replace(/_/g, " ")}
                         </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        {(() => {
+                          const approver = e.main_manager || e.manager;
+                          return approver ? (
+                            <div className="flex items-center gap-1.5">
+                              <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-400 to-violet-500 flex items-center justify-center text-white font-bold text-[10px] flex-shrink-0">
+                                {approver.full_name?.[0]?.toUpperCase()}
+                              </div>
+                              <span className="text-xs font-semibold text-gray-700">{approver.full_name}</span>
+                            </div>
+                          ) : <span className="text-gray-300 text-xs">—</span>;
+                        })()}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
+                        {(() => {
+                          const dt = e.main_manager_action_at || e.manager_action_at;
+                          if (!dt) return <span className="text-gray-300">—</span>;
+                          const d = new Date(dt.endsWith("Z") ? dt : dt + "Z");
+                          return (
+                            <div>
+                              <div className="font-medium text-gray-700">{d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}</div>
+                              <div className="text-gray-400 text-[10px]">{d.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}</div>
+                            </div>
+                          );
+                        })()}
                       </td>
                     </tr>
                   ))}

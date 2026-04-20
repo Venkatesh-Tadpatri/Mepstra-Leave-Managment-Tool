@@ -226,7 +226,7 @@ export default function EmployeesPage() {
                 return (
                   <motion.tr key={u.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }}
                     transition={{ delay: i * 0.025 }}
-                    className={`border-b border-gray-100 transition-colors ${i % 2 === 0 ? "bg-white hover:bg-blue-50/30" : "bg-slate-50/70 hover:bg-blue-50/40"}`}>
+                    className={`border-b border-gray-100 transition-colors ${i % 2 === 0 ? "bg-white hover:bg-blue-50/30" : "bg-slate-50/60 hover:bg-blue-50/40"}`}>
                     <td className="px-4 py-3.5">
                       <div className="flex items-center gap-3">
                         {u.profile_image ? (

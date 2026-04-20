@@ -105,8 +105,8 @@ export default function LoginPage() {
         {/* ── bottom tagline ── */}
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.7 }} className="relative z-10">
-          <p className="text-[10px] font-bold text-white uppercase tracking-[0.3em] mb-1">Trusted by Mepstra Teams</p>
-          <p className="text-white/60 text-xs leading-relaxed">Secure · Fast · Reliable leave management</p>
+          <p className="text-[10px] font-bold text-white uppercase tracking-[0.3em] mb-1 drop-shadow-sm">Trusted by Mepstra Teams</p>
+          <p className="text-white/90 text-xs leading-relaxed drop-shadow-sm">Secure · Fast · Reliable leave management</p>
         </motion.div>
       </div>
 
@@ -145,26 +145,17 @@ export default function LoginPage() {
               <div>
                 <div className="flex items-center gap-1.5">
                   <p className="text-lg font-black text-white leading-none">Mepstra</p>
-                  <MdShield className="text-white/70 text-sm" />
+                  <span className="text-base">🏢</span>
                 </div>
                 <p className="text-[10px] text-white/80 font-semibold tracking-wider uppercase leading-none mt-0.5">Smart Leave Management Portal</p>
               </div>
             </div>
 
-            {/* right: leave type mini icons */}
+            {/* right: removed icons (no functionality) */}
             <div className="hidden sm:flex items-center gap-1.5">
               {[
-                { icon: <MdBeachAccess className="text-xs" />,     tip: "Annual",    col: "bg-cyan-500"    },
-                { icon: <MdHealthAndSafety className="text-xs" />, tip: "Sick",      col: "bg-rose-500"    },
-                { icon: <FaLeaf className="text-[10px]" />,        tip: "Casual",    col: "bg-emerald-500" },
-                { icon: <MdFamilyRestroom className="text-xs" />,  tip: "Maternity", col: "bg-purple-500"  },
-                { icon: <MdCalendarMonth className="text-xs" />,   tip: "Privilege", col: "bg-amber-500"   },
               ].map((ic, i) => (
                 <motion.div key={i}
-                  initial={{ opacity: 0, scale: 0 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: 0.3 + i * 0.07 }}
-                  title={ic.tip}
                   className={`w-6 h-6 rounded-lg ${ic.col} flex items-center justify-center text-white shadow-sm cursor-default`}>
                   {ic.icon}
                 </motion.div>
@@ -242,13 +233,37 @@ export default function LoginPage() {
 
             <AnimatePresence>
               {error && (
-                <motion.div
-                  initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
-                  className="flex items-start gap-2.5 px-4 py-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-sm font-medium"
-                >
-                  <span className="text-base flex-shrink-0">⚠️</span>
-                  <span>{error}</span>
-                </motion.div>
+                error === "ACCOUNT_NOT_FOUND" ? (
+                  <motion.div
+                    initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
+                    className="flex items-start gap-2.5 px-4 py-3 bg-amber-50 border border-amber-300 rounded-xl text-sm"
+                  >
+                    <span className="text-base flex-shrink-0">📋</span>
+                    <div>
+                      <p className="font-semibold text-amber-800">No account found for this email.</p>
+                      <p className="text-amber-700 text-xs mt-0.5">Your email is registered in the system but you haven't created an account yet. Please create an account to continue.</p>
+                    </div>
+                  </motion.div>
+                ) : error === "EMAIL_NOT_REGISTERED" ? (
+                  <motion.div
+                    initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
+                    className="flex items-start gap-2.5 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-sm"
+                  >
+                    <span className="text-base flex-shrink-0">🚫</span>
+                    <div>
+                      <p className="font-semibold text-red-700">Email not recognized.</p>
+                      <p className="text-red-600 text-xs mt-0.5">This email is not registered in our system. Please check your email address or contact your administrator.</p>
+                    </div>
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
+                    className="flex items-start gap-2.5 px-4 py-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-sm font-medium"
+                  >
+                    <span className="text-base flex-shrink-0">⚠️</span>
+                    <span>{error}</span>
+                  </motion.div>
+                )
               )}
             </AnimatePresence>
 

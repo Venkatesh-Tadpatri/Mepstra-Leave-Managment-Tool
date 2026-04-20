@@ -2,19 +2,6 @@ from pydantic import BaseModel, EmailStr, field_validator, model_validator
 from typing import Optional, List
 from datetime import date, datetime
 from app.models.models import UserRole, LeaveType, LeaveStatus, HolidayType, EmploymentType, BusinessUnit, Gender, MaritalStatus
-import re
-
-
-def _is_company_email(email: str) -> bool:
-    return bool(re.match(r"^[^@]+@(mepstra|mepstra)\.com$", email))
-
-
-def _is_allowed_gmail(email: str) -> bool:
-    if not re.match(r"^[^@]+@gmail\.com$", email):
-        return False
-
-    username = email.split("@")[0]
-    return "mepstra" in username.lower() or "mepstra" in username.lower()
 
 
 # ─── Auth ───────────────────────────────────────────────
@@ -36,12 +23,7 @@ class OTPSendRequest(BaseModel):
     @field_validator("email")
     @classmethod
     def validate_email(cls, v: str) -> str:
-        v = v.strip().lower()
-        if _is_company_email(v):
-            return v
-        if _is_allowed_gmail(v):
-            return v
-        raise ValueError("Only @mepstra.com, @mepstra.com, or Gmail IDs containing 'mepstra'/'mepstra' are allowed")
+        return v.strip().lower()
 
 
 class OTPVerifyRequest(BaseModel):
@@ -88,12 +70,7 @@ class UserCreate(BaseModel):
     @field_validator("email")
     @classmethod
     def validate_email(cls, v: str) -> str:
-        v = v.strip().lower()
-        if _is_company_email(v):
-            return v
-        if _is_allowed_gmail(v):
-            return v
-        raise ValueError("Only @mepstra.com, @mepstra.com, or Gmail IDs containing 'mepstra'/'mepstra' are allowed")
+        return v.strip().lower()
 
     @field_validator("password")
     @classmethod
@@ -235,6 +212,7 @@ class LeaveRequestResponse(BaseModel):
     created_at: datetime
     user: Optional[UserSummary] = None
     manager: Optional[UserSummary] = None
+    main_manager: Optional[UserSummary] = None
 
     model_config = {"from_attributes": True}
 

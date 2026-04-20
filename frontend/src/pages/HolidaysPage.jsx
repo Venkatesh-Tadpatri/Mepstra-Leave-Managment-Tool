@@ -139,7 +139,7 @@ export default function HolidaysPage() {
                 return (
                   <motion.div key={h.id}
                     initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.05 }}
-                    className="flex items-center gap-4 p-3 rounded-xl hover:bg-gray-50 transition-colors group"
+                    className={`flex items-center gap-4 p-3 rounded-xl transition-colors group ${i % 2 === 0 ? "bg-white hover:bg-blue-50/30" : "bg-slate-50/60 hover:bg-blue-50/40"}`}
                   >
                     {/* Date badge */}
                     <div className={`w-12 h-12 rounded-xl flex flex-col items-center justify-center text-white flex-shrink-0 shadow-md bg-gradient-to-br ${MONTH_BG[month]}`}>

@@ -13,7 +13,7 @@ export default function Layout() {
       <Sidebar />
       <div
         className={`flex flex-col flex-1 overflow-hidden transition-all duration-300 ${
-          sidebarOpen ? "ml-64" : "ml-16"
+          sidebarOpen ? "ml-[210px]" : "ml-[68px]"
         }`}
       >
         <Header />

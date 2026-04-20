@@ -7,6 +7,10 @@ from app.db.database import get_db
 from app.api.deps import get_current_user
 from app.schemas.schemas import WFHCreate, WFHUpdate, WFHResponse
 from app.models.models import WorkFromHomeRequest, WFHStatus, User, UserRole, Department
+from app.services.email_service import send_wfh_request_email, send_wfh_status_email
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/wfh", tags=["Work From Home"])
 
@@ -77,6 +81,23 @@ def submit_wfh(
     db.add(req)
     db.commit()
     db.refresh(req)
+
+    # Notify manager
+    manager = db.query(User).filter(User.id == current_user.manager_id).first()
+    if manager:
+        try:
+            send_wfh_request_email(
+                employee_name=current_user.full_name,
+                start_date=data.start_date,
+                end_date=data.end_date,
+                total_days=days,
+                reason=data.reason or "",
+                approver_email=manager.email,
+                approver_name=manager.full_name,
+            )
+        except Exception as e:
+            logger.warning("WFH request email failed: %s", e)
+
     return _serialize(req)
 
 
@@ -192,10 +213,28 @@ def action_wfh(
     else:
         raise HTTPException(400, "action must be 'approve' or 'reject'")
 
+    req.manager_id = current_user.id
     req.manager_comment = data.comment
     req.manager_action_at = datetime.utcnow()
     db.commit()
     db.refresh(req)
+
+    # Notify employee
+    employee = db.query(User).filter(User.id == req.user_id).first()
+    if employee:
+        try:
+            send_wfh_status_email(
+                employee_email=employee.email,
+                employee_name=employee.full_name,
+                start_date=req.start_date,
+                end_date=req.end_date,
+                total_days=req.total_days,
+                status=data.action + "d",  # "approved" / "rejected"
+                comment=data.comment or "",
+            )
+        except Exception as e:
+            logger.warning("WFH status email failed: %s", e)
+
     return _serialize(req)
 
 

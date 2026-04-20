@@ -19,7 +19,7 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 # ─── In-memory OTP store: email -> {"otp": str, "expires": datetime, "verified": bool}
 _otp_store: dict = {}
 
-OTP_EXPIRY_MINUTES = 10
+OTP_EXPIRY_SECONDS = 150  # 2 minutes 30 seconds
 
 
 def _generate_otp() -> str:
@@ -42,7 +42,22 @@ def _email_candidates(email: str) -> list[str]:
 def authenticate_user(email: str, password: str, db: Session):
     candidates = _email_candidates(email)
     user = db.query(User).filter(or_(*(User.email == candidate for candidate in candidates))).first()
-    if not user or not verify_password(password, user.hashed_password):
+    if not user:
+        normalized = email.strip().lower()
+        # Check if this email is in the whitelist but hasn't registered yet
+        in_whitelist = db.query(AllowedEmail).filter(
+            or_(AllowedEmail.outlook_email == normalized, AllowedEmail.gmail == normalized)
+        ).first()
+        if in_whitelist:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="ACCOUNT_NOT_FOUND"
+            )
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="EMAIL_NOT_REGISTERED"
+        )
+    if not verify_password(password, user.hashed_password):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or PIN")
     if not user.is_active:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account is deactivated")
@@ -94,7 +109,7 @@ def send_otp(data: OTPSendRequest, db: Session = Depends(get_db)):
     otp = _generate_otp()
     _otp_store[email] = {
         "otp": otp,
-        "expires": datetime.utcnow() + timedelta(minutes=OTP_EXPIRY_MINUTES),
+        "expires": datetime.utcnow() + timedelta(seconds=OTP_EXPIRY_SECONDS),
         "verified": False,
     }
 
@@ -106,9 +121,9 @@ def send_otp(data: OTPSendRequest, db: Session = Depends(get_db)):
 
     # Always log OTP to console for development convenience
     logger.info("OTP for %s: %s", email, otp)
-    print(f"\n>>> OTP for {email}: {otp} (valid {OTP_EXPIRY_MINUTES} min) <<<\n")
+    print(f"\n>>> OTP for {email}: {otp} (valid 2 min 30 sec) <<<\n")
 
-    return {"message": "OTP sent to your email address", "expires_in_minutes": OTP_EXPIRY_MINUTES}
+    return {"message": "OTP sent to your email address", "expires_in_seconds": OTP_EXPIRY_SECONDS}
 
 
 @router.post("/verify-otp", status_code=200)

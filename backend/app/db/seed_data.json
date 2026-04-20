@@ -1,0 +1,76 @@
+{
+  "departments": [
+    {
+      "business_unit": "MEPSTRA_POWER_SOLUTIONS",
+      "name": "Sales Team",
+      "description": "Sales department"
+    },
+    {
+      "business_unit": "MEPSTRA_POWER_SOLUTIONS",
+      "name": "Service Team",
+      "description": "Service department"
+    },
+    {
+      "business_unit": "MEPSTRA_POWER_SOLUTIONS",
+      "name": "Plant Team",
+      "description": "Factory department"
+    },
+    {
+      "business_unit": "MEPSTRA_POWER_SOLUTIONS",
+      "name": "HR/Admin",
+      "description": "HR and Administration team"
+    },
+    {
+      "business_unit": "MEPSTRA_ENGINEERING_CONSULTANCY",
+      "name": "Mechanical Engineering",
+      "description": "Mechanical engineering department"
+    },
+    {
+      "business_unit": "MEPSTRA_ENGINEERING_CONSULTANCY",
+      "name": "Electrical Engineering",
+      "description": "Electrical engineering department"
+    },
+    {
+      "business_unit": "MEPSTRA_ENGINEERING_CONSULTANCY",
+      "name": "Software Engineeer",
+      "description": "Software department"
+    },
+    {
+      "business_unit": "MEPSTRA_ENGINEERING_CONSULTANCY",
+      "name": "HR/Admin",
+      "description": "HR and Administration team"
+    }
+  ],
+
+  "users": [
+    {
+      "email": "admin@mepstra.com",
+      "full_name": "Deepak Dixith",
+      "password": "1234",
+      "role": "ADMIN",
+      "employment_type": "PERMANENT",
+      "business_unit": "MEPSTRA_ENGINEERING_CONSULTANCY",
+      "department": "Mechanical Engineering",
+      "joining_date": "2020-01-01",
+      "manager": null,
+      "hr": null
+    },
+    {
+      "email": "hr@mepstra.com",
+      "full_name": "Kavya Reddy",
+      "password": "1234",
+      "role": "HR",
+      "employment_type": "PERMANENT",
+      "business_unit": "MEPSTRA_ENGINEERING_CONSULTANCY",
+      "department": "HR/Admin",
+      "joining_date": "2020-03-01",
+      "manager": null,
+      "hr": null
+    }
+    
+  ],
+
+  "holidays": [
+   
+  ]
+}

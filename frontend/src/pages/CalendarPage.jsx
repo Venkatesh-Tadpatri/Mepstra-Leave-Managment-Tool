@@ -3,9 +3,9 @@ import { useSelector } from "react-redux";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import interactionPlugin from "@fullcalendar/interaction";
-import { getLeaves, getTeamLeaves, getHolidays } from "../services/api";
+import { getLeaves, getTeamLeaves, getHolidays, getMyWFH, getAllWFH } from "../services/api";
 import { motion, AnimatePresence } from "framer-motion";
-import { MdClose, MdCalendarMonth, MdCelebration } from "react-icons/md";
+import { MdClose, MdCalendarMonth, MdCelebration, MdHomeWork } from "react-icons/md";
 
 const STATUS_COLORS = {
   pending: "#f59e0b",
@@ -33,11 +33,14 @@ function getLeaveDisplayType(leave) {
   return leave.leave_type;
 }
 
+const WFH_COLOR = "#0284c7";
+
 const LEGEND = [
   { label: "Approved Leave", color: "#10b981" },
   { label: "Pending Leave", color: "#f59e0b" },
   { label: "Manager Approved", color: "#3b82f6" },
   { label: "Weekend Work Request", color: WEEKEND_WORK_COLOR },
+  { label: "Work From Home", color: WFH_COLOR },
   { label: "Mandatory Holiday", color: "#6366f1" },
   { label: "Optional Holiday", color: "#ec4899" },
 ];
@@ -51,11 +54,13 @@ export default function CalendarPage() {
   const [selected, setSelected] = useState(null);
 
   const isTeamView = ["manager", "hr"].includes(user?.role);
+  const isAdminView = ["admin", "main_manager"].includes(user?.role);
 
   useEffect(() => {
     const year = new Date().getFullYear();
     const leaveFetch = isTeamView ? getTeamLeaves({ year }) : getLeaves({ year });
-    Promise.all([leaveFetch, getHolidays(year)]).then(([leavesRes, holidaysRes]) => {
+    const wfhFetch = (isTeamView || isAdminView) ? getAllWFH() : getMyWFH();
+    Promise.all([leaveFetch, getHolidays(year), wfhFetch]).then(([leavesRes, holidaysRes, wfhRes]) => {
       const leaveEvents = leavesRes.data.map((l) => ({
         id: `leave-${l.id}`,
         title: `${l.user?.full_name || "You"} - ${getLeaveDisplayType(l)}`,
@@ -77,9 +82,46 @@ export default function CalendarPage() {
         extendedProps: { type: "holiday", data: h },
       }));
 
-      setEvents([...leaveEvents, ...holidayEvents]);
+      const wfhEvents = (wfhRes.data || [])
+        .filter((w) => w.status === "approved")
+        .map((w) => ({
+          id: `wfh-${w.id}`,
+          title: `${w.user?.full_name || "You"} - WFH`,
+          start: w.start_date,
+          end: w.end_date,
+          backgroundColor: WFH_COLOR,
+          borderColor: WFH_COLOR,
+          textColor: "#fff",
+          extendedProps: { type: "wfh", data: w },
+        }));
+
+      setEvents([...leaveEvents, ...holidayEvents, ...wfhEvents]);
+    }).catch(() => {
+      // Fallback: load without WFH if endpoint fails
+      Promise.all([leaveFetch, getHolidays(year)]).then(([leavesRes, holidaysRes]) => {
+        const leaveEvents = leavesRes.data.map((l) => ({
+          id: `leave-${l.id}`,
+          title: `${l.user?.full_name || "You"} - ${getLeaveDisplayType(l)}`,
+          start: l.start_date,
+          end: l.end_date,
+          backgroundColor: isWeekendWorkRequest(l) ? WEEKEND_WORK_COLOR : (STATUS_COLORS[l.status] || "#6b7280"),
+          borderColor: isWeekendWorkRequest(l) ? WEEKEND_WORK_COLOR : (STATUS_COLORS[l.status] || "#6b7280"),
+          textColor: "#fff",
+          extendedProps: { type: "leave", data: l },
+        }));
+        const holidayEvents = holidaysRes.data.map((h) => ({
+          id: `holiday-${h.id}`,
+          title: h.name,
+          start: h.date,
+          backgroundColor: HOLIDAY_COLORS[h.holiday_type] || "#6366f1",
+          borderColor: HOLIDAY_COLORS[h.holiday_type] || "#6366f1",
+          textColor: "#fff",
+          extendedProps: { type: "holiday", data: h },
+        }));
+        setEvents([...leaveEvents, ...holidayEvents]);
+      });
     });
-  }, [isTeamView]);
+  }, [isTeamView, isAdminView]);
 
   return (
     <motion.div initial="hidden" animate="show" variants={stagger} className="space-y-5">
@@ -107,7 +149,7 @@ export default function CalendarPage() {
       <motion.div variants={fadeUp} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 overflow-hidden">
         <style>{`
           .fc .fc-toolbar-title { font-size: 1.1rem; font-weight: 800; color: #111827; }
-          .fc .fc-button { background: #f3f4f6 !important; border: 1px solid #e5e7eb !important; color: #374151 !important; border-radius: 8px !important; font-weight: 600; font-size: 0.8rem; }
+          .fc .fc-button { background: #f3f4f6 !important; border: 1px solid #e5e7eb !important; color: #374151 !important; border-radius: 8px !important; font-weight: 600; font-size: 0.8rem; text-transform: capitalize; }
           .fc .fc-button:hover { background: #e5e7eb !important; }
           .fc .fc-button-primary:not(:disabled).fc-button-active { background: #2563eb !important; border-color: #2563eb !important; color: white !important; }
           .fc .fc-day-today { background: #eff6ff !important; }
@@ -144,12 +186,24 @@ export default function CalendarPage() {
               onClick={(e) => e.stopPropagation()}
             >
               <div className={`p-5 flex items-center justify-between ${
-                selected.type === "holiday" ? "bg-gradient-to-r from-indigo-600 to-violet-700" : "bg-gradient-to-r from-slate-800 to-slate-900"
+                selected.type === "holiday"
+                  ? "bg-gradient-to-r from-indigo-600 to-violet-700"
+                  : selected.type === "wfh"
+                  ? "bg-gradient-to-r from-sky-600 to-cyan-700"
+                  : "bg-gradient-to-r from-slate-800 to-slate-900"
               }`}>
                 <div className="flex items-center gap-2.5">
-                  {selected.type === "holiday" ? <MdCelebration className="text-white text-xl" /> : <MdCalendarMonth className="text-white text-xl" />}
+                  {selected.type === "holiday" ? (
+                    <MdCelebration className="text-white text-xl" />
+                  ) : selected.type === "wfh" ? (
+                    <MdHomeWork className="text-white text-xl" />
+                  ) : (
+                    <MdCalendarMonth className="text-white text-xl" />
+                  )}
                   <div>
-                    <h3 className="text-white font-bold">{selected.type === "holiday" ? "Holiday" : "Request Details"}</h3>
+                    <h3 className="text-white font-bold">
+                      {selected.type === "holiday" ? "Holiday" : selected.type === "wfh" ? "Work From Home" : "Request Details"}
+                    </h3>
                   </div>
                 </div>
                 <button onClick={() => setSelected(null)} className="w-7 h-7 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20">
@@ -158,7 +212,28 @@ export default function CalendarPage() {
               </div>
 
               <div className="p-5 space-y-3">
-                {selected.type === "leave" ? (
+                {selected.type === "wfh" ? (
+                  <>
+                    {[
+                      { label: "Employee", value: selected.data.user?.full_name },
+                      { label: "From", value: selected.data.start_date },
+                      { label: "To", value: selected.data.end_date },
+                      { label: "Days", value: `${selected.data.total_days} day(s)` },
+                      { label: "Status", value: selected.data.status, capitalize: true },
+                    ].map((row) => (
+                      <div key={row.label} className="flex justify-between items-center py-2 border-b border-gray-50 last:border-0">
+                        <span className="text-sm text-gray-400">{row.label}</span>
+                        <span className={`text-sm font-semibold text-gray-800 ${row.capitalize ? "capitalize" : ""}`}>{row.value}</span>
+                      </div>
+                    ))}
+                    {selected.data.reason && (
+                      <div className="pt-1">
+                        <p className="text-xs text-gray-400 mb-1">Reason</p>
+                        <p className="text-sm text-gray-700 bg-gray-50 rounded-lg p-3">{selected.data.reason}</p>
+                      </div>
+                    )}
+                  </>
+                ) : selected.type === "leave" ? (
                   <>
                     {[
                       { label: "Employee", value: selected.data.user?.full_name },

@@ -2,11 +2,10 @@ import { useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { fetchLeaves, fetchBalance } from "../store/slices/leaveSlice";
-import { cancelLeave, getLeaves } from "../services/api";
-import toast from "react-hot-toast";
+import { getLeaves } from "../services/api";
 import { motion, AnimatePresence } from "framer-motion";
-import { MdAdd, MdFilterList, MdClose, MdCancel, MdEventNote, MdBeachAccess, MdLocalHospital, MdStar } from "react-icons/md";
-import { format } from "date-fns";
+import { MdAdd, MdFilterList, MdClose, MdEventNote, MdBeachAccess, MdLocalHospital, MdStar } from "react-icons/md";
+import { format, parseISO } from "date-fns";
 
 const LEAVE_COLORS = {
   casual:    { bg: "bg-blue-100",   text: "text-blue-700",   dot: "#3b82f6" },
@@ -69,17 +68,6 @@ export default function LeavesPage() {
     }
     return byType;
   }, [yearLeaves]);
-
-  async function handleCancel(id) {
-    if (!confirm("Cancel this leave request?")) return;
-    try {
-      await cancelLeave(id);
-      toast.success("Leave cancelled");
-      dispatch(fetchLeaves(filter));
-    } catch (err) {
-      toast.error(err.response?.data?.detail || "Failed to cancel");
-    }
-  }
 
   return (
     <motion.div initial="hidden" animate="show" variants={stagger} className="space-y-6">
@@ -200,7 +188,7 @@ export default function LeavesPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-100">
-                  {["#", "Type", "From", "To", "Days", "Reason", "Status", "Applied On", "Action"].map((h) => (
+                  {["#", "Type", "From", "To", "Days", "Reason", "Status", "Remarks", "Approved By", "Approved On", "Applied On"].map((h) => (
                     <th key={h} className="px-4 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">{h}</th>
                   ))}
                 </tr>
@@ -212,10 +200,10 @@ export default function LeavesPage() {
                   return (
                     <motion.tr key={l.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }}
                       transition={{ delay: i * 0.03 }}
-                      className="border-b border-gray-50 hover:bg-blue-50/30 transition-colors">
+                      className={`border-b border-gray-100 transition-colors ${i % 2 === 0 ? "bg-white hover:bg-blue-50/30" : "bg-slate-50/60 hover:bg-blue-50/40"}`}>
                       <td className="px-4 py-3.5 text-gray-300 font-mono text-xs">{i + 1}</td>
                       <td className="px-4 py-3.5">
-                        <span className={`px-3 py-1 rounded-full text-xs font-semibold capitalize ${lc.bg} ${lc.text}`}>
+                        <span className={`px-2.5 py-1 rounded-full text-xs font-semibold capitalize whitespace-nowrap ${lc.bg} ${lc.text}`}>
                           {getLeaveTypeLabel(l)}
                         </span>
                       </td>
@@ -232,17 +220,53 @@ export default function LeavesPage() {
                           {l.status.replace(/_/g, " ")}
                         </span>
                       </td>
-                      <td className="px-4 py-3.5 text-gray-400 text-xs whitespace-nowrap">
-                        {format(new Date(l.created_at), "dd MMM yyyy")}
+                      <td className="px-4 py-3.5 max-w-[200px]">
+                        {(l.status === "rejected") && (l.manager_comment || l.main_manager_comment) ? (
+                          <div className="flex items-start gap-1.5 px-2.5 py-1.5 bg-red-50 border border-red-200 rounded-lg">
+                            <span className="text-red-400 text-xs mt-0.5 flex-shrink-0">✕</span>
+                            <span className="text-red-700 text-xs font-medium leading-snug">
+                              {l.manager_comment || l.main_manager_comment}
+                            </span>
+                          </div>
+                        ) : l.status === "approved" && (l.manager_comment || l.main_manager_comment) ? (
+                          <div className="flex items-start gap-1.5 px-2.5 py-1.5 bg-green-50 border border-green-200 rounded-lg">
+                            <span className="text-green-500 text-xs mt-0.5 flex-shrink-0">✓</span>
+                            <span className="text-green-700 text-xs font-medium leading-snug">
+                              {l.manager_comment || l.main_manager_comment}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-gray-300 text-xs italic">—</span>
+                        )}
                       </td>
                       <td className="px-4 py-3.5">
-                        {l.status === "pending" && (
-                          <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
-                            onClick={() => handleCancel(l.id)}
-                            className="flex items-center gap-1 text-xs text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 px-2.5 py-1.5 rounded-lg transition-colors">
-                            <MdCancel className="text-sm" /> Cancel
-                          </motion.button>
-                        )}
+                        {(() => {
+                          const approver = l.main_manager || l.manager;
+                          return approver ? (
+                            <div className="flex items-center gap-1.5">
+                              <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-400 to-violet-500 flex items-center justify-center text-white font-bold text-[10px] flex-shrink-0">
+                                {approver.full_name?.[0]?.toUpperCase()}
+                              </div>
+                              <span className="text-xs font-semibold text-gray-700">{approver.full_name}</span>
+                            </div>
+                          ) : <span className="text-gray-300 text-xs">—</span>;
+                        })()}
+                      </td>
+                      <td className="px-4 py-3.5 text-xs text-gray-500 whitespace-nowrap">
+                        {(() => {
+                          const dt = l.main_manager_action_at || l.manager_action_at;
+                          if (!dt) return <span className="text-gray-300">—</span>;
+                          const d = new Date(dt.endsWith("Z") ? dt : dt + "Z");
+                          return (
+                            <div>
+                              <div className="font-medium text-gray-700">{d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}</div>
+                              <div className="text-gray-400 text-[10px]">{d.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}</div>
+                            </div>
+                          );
+                        })()}
+                      </td>
+                      <td className="px-4 py-3.5 text-gray-400 text-xs whitespace-nowrap">
+                        {format(new Date(l.created_at), "dd MMM yyyy")}
                       </td>
                     </motion.tr>
                   );

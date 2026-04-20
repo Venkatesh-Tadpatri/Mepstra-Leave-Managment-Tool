@@ -152,6 +152,7 @@ export default function RegisterPage() {
   const [otpSent, setOtpSent] = useState(false);
   const [otpVerified, setOtpVerified] = useState(false);
   const [otpLoading, setOtpLoading] = useState(false);
+  const [otpSendLoading, setOtpSendLoading] = useState(false);
   const [otpTimer, setOtpTimer] = useState(0);
   const [step, setStep] = useState(1);
   const [form, setForm] = useState({
@@ -246,6 +247,8 @@ export default function RegisterPage() {
     if (form.phone && !/^\d{10}$/.test(form.phone)) e.phone = "Phone must be exactly 10 digits";
     if (!form.pin || !/^\d{4}$/.test(form.pin)) e.pin = "PIN must be exactly 4 digits";
     if (form.pin !== form.confirm_pin) e.confirm_pin = "PINs don't match";
+    if (!form.department_id) e.department_id = "Please select a department";
+    if (!isManagerRole && !form.manager_id) e.manager_id = "Please select a reporting manager";
     setErrors(e);
     return Object.keys(e).length === 0;
   }
@@ -257,12 +260,14 @@ export default function RegisterPage() {
   }
 
   async function handleSendOtp() {
-    setOtpLoading(true);
+    setOtpSendLoading(true);
     try {
       await api.post("/auth/send-otp", { email: form.email.trim().toLowerCase() });
       setOtpSent(true);
       setOtpVerified(false);
       setOtpTimer(150);
+      setForm((f) => ({ ...f, otp_code: "" }));
+      setErrors((e) => ({ ...e, otp_code: "" }));
       setStep(3);
       toast.success("OTP sent to your email!");
     } catch (err) {
@@ -270,7 +275,7 @@ export default function RegisterPage() {
       setErrors((e) => ({ ...e, email: msg }));
       toast.error(msg);
     } finally {
-      setOtpLoading(false);
+      setOtpSendLoading(false);
     }
   }
 
@@ -278,6 +283,10 @@ export default function RegisterPage() {
     ev.preventDefault();
     if (!form.otp_code || form.otp_code.length !== 6) {
       setErrors((e) => ({ ...e, otp_code: "Enter the 6-digit OTP" }));
+      return;
+    }
+    if (otpTimer === 0) {
+      setErrors((e) => ({ ...e, otp_code: "OTP has expired. Please click Resend to get a new one." }));
       return;
     }
     setOtpLoading(true);
@@ -482,31 +491,10 @@ export default function RegisterPage() {
               <div>
                 <div className="flex items-center gap-1.5">
                   <p className="text-lg font-black text-white leading-none">Mepstra</p>
-                  <MdShield className="text-white/70 text-sm" />
+                  <span className="text-base">🏢</span>
                 </div>
                 <p className="text-[10px] text-white/80 font-semibold tracking-wider uppercase leading-none mt-0.5">Smart Leave Management Portal</p>
               </div>
-            </div>
-
-            {/* right: leave type mini icons */}
-            <div className="hidden sm:flex items-center gap-1.5">
-              {[
-                { icon: <MdBeachAccess className="text-xs" />,     tip: "Annual",    col: "bg-cyan-500"    },
-                { icon: <MdHealthAndSafety className="text-xs" />, tip: "Sick",      col: "bg-rose-500"    },
-                { icon: <FaLeaf className="text-[10px]" />,        tip: "Casual",    col: "bg-emerald-500" },
-                { icon: <MdFamilyRestroom className="text-xs" />,  tip: "Maternity", col: "bg-purple-500"  },
-                { icon: <MdCalendarMonth className="text-xs" />,   tip: "Privilege", col: "bg-amber-500"   },
-              ].map((ic, i) => (
-                <motion.div key={i}
-                  initial={{ opacity: 0, scale: 0 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: 0.3 + i * 0.07 }}
-                  title={ic.tip}
-                  className={`w-6 h-6 rounded-lg ${ic.col} flex items-center justify-center text-white shadow-sm cursor-default`}>
-                  {ic.icon}
-                </motion.div>
-              ))}
-              <span className="text-teal-100 text-[10px] font-semibold ml-1">+more</span>
             </div>
           </div>
         </motion.div>
@@ -665,21 +653,21 @@ export default function RegisterPage() {
               onSubmit={handleNext2} className="flex flex-col gap-2">
 
               <div className="grid grid-cols-2 gap-2">
-                <InputField label="Full Name *" icon={MdPerson} name="full_name"
+                <InputField label={<>Full Name <span className="text-red-500">*</span></>} icon={MdPerson} name="full_name"
                   value={form.full_name} onChange={handleChange} placeholder="John Doe" error={errors.full_name} required />
                 <InputField label="Phone" icon={MdPhone} name="phone" value={form.phone} onChange={handleChange}
                   placeholder="9876543210" error={errors.phone} maxLength={10} inputMode="numeric" />
               </div>
 
               <div>
-                <InputField label="Email Address *" icon={MdEmail} type="email" name="email"
+                <InputField label={<>Email Address <span className="text-red-500">*</span></>} icon={MdEmail} type="email" name="email"
                   value={form.email} onChange={handleChange} placeholder="you@mepstra.com" error={errors.email} required />
                 <p className="text-xs text-amber-600 mt-0.5 font-medium">⚠ Only pre-approved company emails can register.</p>
               </div>
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1 uppercase tracking-wide">4-Digit PIN *</label>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1 uppercase tracking-wide">4-Digit PIN <span className="text-red-500">*</span></label>
                   <div className="relative">
                     <MdLock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-base" />
                     <input type="password" name="pin" value={form.pin} onChange={handleChange}
@@ -689,7 +677,7 @@ export default function RegisterPage() {
                   {errors.pin && <p className="text-xs text-red-500 mt-0.5">{errors.pin}</p>}
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1 uppercase tracking-wide">Confirm PIN *</label>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1 uppercase tracking-wide">Confirm PIN <span className="text-red-500">*</span></label>
                   <div className="relative">
                     <MdLock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-base" />
                     <input type="password" name="confirm_pin" value={form.confirm_pin} onChange={handleChange}
@@ -702,7 +690,7 @@ export default function RegisterPage() {
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1 uppercase tracking-wide">Role *</label>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1 uppercase tracking-wide">Role <span className="text-red-500">*</span></label>
                   <div className="relative">
                     <MdWork className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-base" />
                     <select name="role" value={form.role} onChange={handleChange}
@@ -712,22 +700,23 @@ export default function RegisterPage() {
                   </div>
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1 uppercase tracking-wide">Department</label>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1 uppercase tracking-wide">Department <span className="text-red-500">*</span></label>
                   <div className="relative">
                     <MdBusiness className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-base" />
                     <select name="department_id" value={form.department_id} onChange={handleChange}
                       disabled={!form.business_unit}
-                      className="w-full pl-10 pr-3 py-2 text-sm border border-gray-200 rounded-lg bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 transition-all appearance-none disabled:opacity-60">
+                      className={`w-full pl-10 pr-3 py-2 text-sm border rounded-lg bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 transition-all appearance-none disabled:opacity-60 ${errors.department_id ? "border-red-400" : "border-gray-200"}`}>
                       <option value="">{form.business_unit ? "Select Department" : "Select Business Unit First"}</option>
                       {filteredDepartments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
                     </select>
                   </div>
+                  {errors.department_id && <p className="text-xs text-red-500 mt-0.5">{errors.department_id}</p>}
                 </div>
               </div>
 
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1 uppercase tracking-wide">
-                  Reporting Manager
+                  Reporting Manager {!isManagerRole && <span className="text-red-500">*</span>}
                   {isManagerRole && <span className="ml-2 text-teal-500 normal-case font-normal">(auto-assigned to Admin)</span>}
                 </label>
                 <div className="relative">
@@ -738,12 +727,13 @@ export default function RegisterPage() {
                     </div>
                   ) : (
                     <select name="manager_id" value={form.manager_id} onChange={handleChange}
-                      className="w-full pl-10 pr-3 py-2 text-sm border border-gray-200 rounded-lg bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 transition-all appearance-none">
+                      className={`w-full pl-10 pr-3 py-2 text-sm border rounded-lg bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 transition-all appearance-none ${errors.manager_id ? "border-red-400" : "border-gray-200"}`}>
                       <option value="">Select Manager</option>
                       {filteredManagers.map((m) => <option key={m.id} value={m.id}>{m.full_name} ({m.role.replace("_", " ")})</option>)}
                     </select>
                   )}
                 </div>
+                {errors.manager_id && <p className="text-xs text-red-500 mt-0.5">{errors.manager_id}</p>}
               </div>
 
               <div className="flex gap-2 mt-1">
@@ -752,9 +742,9 @@ export default function RegisterPage() {
                   className="flex-1 py-2.5 bg-white border-2 border-gray-200 text-gray-700 rounded-lg font-bold text-sm hover:border-gray-300 transition-colors">
                   ← Back
                 </motion.button>
-                <motion.button type="submit" disabled={otpLoading} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+                <motion.button type="submit" disabled={otpSendLoading} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                   className="flex-1 py-2.5 bg-gradient-to-r from-teal-600 to-emerald-600 text-white rounded-lg font-bold text-sm shadow-lg shadow-teal-500/30 disabled:opacity-60 flex items-center justify-center gap-1.5">
-                  {otpLoading ? (
+                  {otpSendLoading ? (
                     <><motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 0.8 }}
                       className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full" /> Sending...</>
                   ) : <><MdSend className="text-sm" /> Send OTP</>}
@@ -781,7 +771,7 @@ export default function RegisterPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">Enter 6-Digit OTP *</label>
+                <label className="block text-sm font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">Enter 6-Digit OTP <span className="text-red-500">*</span></label>
                 <input type="text" name="otp_code" value={form.otp_code} onChange={handleChange}
                   placeholder="123456" maxLength={6} inputMode="numeric"
                   className={`w-full py-3 text-center text-2xl font-black tracking-[0.5em] border rounded-xl bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 transition-all ${errors.otp_code ? "border-red-400" : "border-gray-200"}`} />
@@ -794,12 +784,13 @@ export default function RegisterPage() {
                   className="flex-1 py-2.5 bg-white border-2 border-gray-200 text-gray-700 rounded-lg font-bold text-sm">
                   ← Back
                 </motion.button>
-                <motion.button type="button" disabled={otpLoading || otpTimer > 120}
+                <motion.button type="button" disabled={otpSendLoading || otpTimer > 120}
                   onClick={handleSendOtp} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                   className="py-2 px-3 bg-gray-100 text-gray-600 rounded-lg font-semibold text-xs disabled:opacity-40 flex items-center gap-1">
-                  <MdRefresh /> Resend
+                  {otpSendLoading ? <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 0.8 }} className="w-3 h-3 border-2 border-gray-400/30 border-t-gray-600 rounded-full" /> : <MdRefresh />}
+                  {otpSendLoading ? "Sending..." : "Resend"}
                 </motion.button>
-                <motion.button type="submit" disabled={otpLoading} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+                <motion.button type="submit" disabled={otpLoading || otpTimer === 0} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                   className="flex-1 py-2.5 bg-gradient-to-r from-teal-600 to-emerald-600 text-white rounded-lg font-bold text-sm shadow-lg shadow-teal-500/30 disabled:opacity-60 flex items-center justify-center gap-1.5">
                   {otpLoading ? (
                     <><motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 0.8 }}
@@ -913,7 +904,7 @@ export default function RegisterPage() {
                 <div className="grid grid-cols-[130px_minmax(0,1fr)] sm:grid-cols-[150px_minmax(0,1fr)] gap-y-1.5 gap-x-3 text-sm">
                   {[
                     ["Name",           form.full_name],
-                    ["Email",          form.email],
+                    ["Email",          form.email.trim().toLowerCase()],
                     ["Phone",          form.phone || "—"],
                     ["Role",           form.role.replace("_", " ")],
                     ["Employment",     form.employment_type || "—"],

@@ -99,7 +99,7 @@ def send_otp_email(to_email: str, otp: str):
                      background:#f0f4ff;border:2px dashed #1a56db;border-radius:12px;
                      padding:16px 32px;color:#1a56db">{otp}</span>
       </div>
-      <p style="color:#6b7280;font-size:13px">This OTP is valid for <strong>10 minutes</strong>. Do not share it with anyone.</p>
+      <p style="color:#6b7280;font-size:13px">This OTP is valid for <strong>2 minutes 30 seconds</strong>. Do not share it with anyone.</p>
       <p style="color:#6b7280;font-size:12px">This is an automated notification from {settings.COMPANY_NAME}.</p>
     </div></body></html>
     """
@@ -154,6 +154,54 @@ def send_leave_status_email(employee_email: str, employee_name: str, leave_type:
         <tr style="background:#f9fafb"><td style="padding:10px;border:1px solid #e5e7eb"><strong>To</strong></td><td style="padding:10px;border:1px solid #e5e7eb">{end_date}</td></tr>
         <tr><td style="padding:10px;border:1px solid #e5e7eb"><strong>Total Days</strong></td><td style="padding:10px;border:1px solid #e5e7eb">{total_days} day(s)</td></tr>
         {"<tr style='background:#f9fafb'><td style='padding:10px;border:1px solid #e5e7eb'><strong>Comment</strong></td><td style='padding:10px;border:1px solid #e5e7eb'>" + comment + "</td></tr>" if comment else ""}
+      </table>
+      <p style="color:#6b7280;font-size:12px">This is an automated notification from {settings.COMPANY_NAME}.</p>
+    </div></body></html>
+    """
+    send_email(employee_email, subject, html)
+
+
+def send_wfh_request_email(employee_name: str, start_date, end_date, total_days: float,
+                            reason: str, approver_email: str, approver_name: str):
+    subject = f"WFH Approval Request - {employee_name}"
+    html = f"""
+    <html><body style="font-family:Arial,sans-serif;color:#333;max-width:600px;margin:auto">
+    <div style="background:#0284c7;padding:20px;border-radius:8px 8px 0 0">
+      <h2 style="color:#fff;margin:0">Work From Home Request</h2>
+    </div>
+    <div style="padding:24px;border:1px solid #e5e7eb;border-radius:0 0 8px 8px">
+      <p>Dear <strong>{approver_name}</strong>,</p>
+      <p><strong>{employee_name}</strong> has submitted a Work From Home request and requires your approval.</p>
+      <table style="width:100%;border-collapse:collapse;margin:16px 0">
+        <tr style="background:#f9fafb"><td style="padding:10px;border:1px solid #e5e7eb"><strong>From</strong></td><td style="padding:10px;border:1px solid #e5e7eb">{start_date}</td></tr>
+        <tr><td style="padding:10px;border:1px solid #e5e7eb"><strong>To</strong></td><td style="padding:10px;border:1px solid #e5e7eb">{end_date}</td></tr>
+        <tr style="background:#f9fafb"><td style="padding:10px;border:1px solid #e5e7eb"><strong>Total Days</strong></td><td style="padding:10px;border:1px solid #e5e7eb">{total_days} day(s)</td></tr>
+        <tr><td style="padding:10px;border:1px solid #e5e7eb"><strong>Reason</strong></td><td style="padding:10px;border:1px solid #e5e7eb">{reason}</td></tr>
+      </table>
+      <p>Please login to the <strong>Mepstra Leave Portal</strong> to approve or reject this request.</p>
+      <p style="color:#6b7280;font-size:12px">This is an automated notification from {settings.COMPANY_NAME}.</p>
+    </div></body></html>
+    """
+    send_email(approver_email, subject, html)
+
+
+def send_wfh_status_email(employee_email: str, employee_name: str, start_date, end_date,
+                           total_days: float, status: str, comment: str = ""):
+    color = "#16a34a" if status == "approved" else "#dc2626"
+    subject = f"Your Work From Home Request has been {status.title()}"
+    html = f"""
+    <html><body style="font-family:Arial,sans-serif;color:#333;max-width:600px;margin:auto">
+    <div style="background:{color};padding:20px;border-radius:8px 8px 0 0">
+      <h2 style="color:#fff;margin:0">Work From Home Request {status.title()}</h2>
+    </div>
+    <div style="padding:24px;border:1px solid #e5e7eb;border-radius:0 0 8px 8px">
+      <p>Dear <strong>{employee_name}</strong>,</p>
+      <p>Your Work From Home request has been <strong style="color:{color}">{status.upper()}</strong>.</p>
+      <table style="width:100%;border-collapse:collapse;margin:16px 0">
+        <tr style="background:#f9fafb"><td style="padding:10px;border:1px solid #e5e7eb"><strong>From</strong></td><td style="padding:10px;border:1px solid #e5e7eb">{start_date}</td></tr>
+        <tr><td style="padding:10px;border:1px solid #e5e7eb"><strong>To</strong></td><td style="padding:10px;border:1px solid #e5e7eb">{end_date}</td></tr>
+        <tr style="background:#f9fafb"><td style="padding:10px;border:1px solid #e5e7eb"><strong>Total Days</strong></td><td style="padding:10px;border:1px solid #e5e7eb">{total_days} day(s)</td></tr>
+        {"<tr><td style='padding:10px;border:1px solid #e5e7eb'><strong>Comment</strong></td><td style='padding:10px;border:1px solid #e5e7eb'>" + comment + "</td></tr>" if comment else ""}
       </table>
       <p style="color:#6b7280;font-size:12px">This is an automated notification from {settings.COMPANY_NAME}.</p>
     </div></body></html>

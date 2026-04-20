@@ -210,6 +210,25 @@ def leave_schedule(
         ]
         q = q.filter(LeaveRequest.user_id.in_(managed_ids))
 
+    results = q.all()
+
+    # Collect approver user IDs to fetch in one query
+    approver_ids = set()
+    for leave, _, _ in results:
+        if leave.main_manager_id:
+            approver_ids.add(leave.main_manager_id)
+        elif leave.manager_id:
+            approver_ids.add(leave.manager_id)
+    approver_map = {}
+    if approver_ids:
+        for u in db.query(User).filter(User.id.in_(approver_ids)).all():
+            approver_map[u.id] = u
+
+    def _user_summary(u):
+        if not u:
+            return None
+        return {"id": u.id, "full_name": u.full_name, "email": u.email, "role": u.role.value, "profile_image": u.profile_image, "department": None}
+
     return [
         {
             "id": leave.id,
@@ -220,8 +239,12 @@ def leave_schedule(
             "end_date": str(leave.end_date),
             "total_days": leave.total_days,
             "status": leave.status.value,
+            "manager": _user_summary(approver_map.get(leave.manager_id)) if not leave.main_manager_id and leave.manager_id else None,
+            "main_manager": _user_summary(approver_map.get(leave.main_manager_id)) if leave.main_manager_id else None,
+            "manager_action_at": (leave.manager_action_at.isoformat() + "Z") if leave.manager_action_at else None,
+            "main_manager_action_at": (leave.main_manager_action_at.isoformat() + "Z") if leave.main_manager_action_at else None,
         }
-        for leave, user, dept in q.all()
+        for leave, user, dept in results
     ]
 
 

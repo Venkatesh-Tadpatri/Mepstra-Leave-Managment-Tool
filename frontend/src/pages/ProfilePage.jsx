@@ -1,14 +1,112 @@
-import { useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import toast from "react-hot-toast";
-import { motion } from "framer-motion";
-import { updateMe, uploadAvatar, removeAvatar } from "../services/api";
+import { motion, AnimatePresence } from "framer-motion";
+import Cropper from "react-easy-crop";
+import { getMe, updateMe, uploadAvatar, removeAvatar } from "../services/api";
 import { updateUser } from "../store/slices/authSlice";
 import {
   MdPerson, MdEmail, MdPhone, MdWork, MdCalendarMonth,
   MdEdit, MdSave, MdClose, MdVerified, MdCameraAlt, MdDeleteOutline,
-  MdCake, MdFavorite, MdWc,
+  MdCake, MdFavorite, MdWc, MdZoomIn, MdZoomOut, MdCheck,
 } from "react-icons/md";
+
+async function getCroppedBlob(imageSrc, pixelCrop) {
+  const image = await new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = imageSrc;
+  });
+  const canvas = document.createElement("canvas");
+  canvas.width = pixelCrop.width;
+  canvas.height = pixelCrop.height;
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(
+    image,
+    pixelCrop.x, pixelCrop.y,
+    pixelCrop.width, pixelCrop.height,
+    0, 0,
+    pixelCrop.width, pixelCrop.height
+  );
+  return new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.92));
+}
+
+function CropModal({ src, onConfirm, onCancel }) {
+  const [crop, setCrop] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
+
+  const onCropComplete = useCallback((_, pixels) => setCroppedAreaPixels(pixels), []);
+
+  async function handleConfirm() {
+    const blob = await getCroppedBlob(src, croppedAreaPixels);
+    onConfirm(blob);
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+    >
+      <motion.div
+        initial={{ opacity: 0, scale: 0.92, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.92 }}
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden"
+      >
+        <div className="bg-gradient-to-r from-slate-800 to-slate-900 px-5 py-4 flex items-center justify-between">
+          <div>
+            <h3 className="text-white font-bold">Adjust Photo</h3>
+            <p className="text-slate-400 text-xs mt-0.5">Drag to reposition · Pinch or scroll to zoom</p>
+          </div>
+          <button onClick={onCancel}
+            className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition-colors">
+            <MdClose />
+          </button>
+        </div>
+
+        {/* Crop area */}
+        <div className="relative w-full" style={{ height: 300, background: "#111" }}>
+          <Cropper
+            image={src}
+            crop={crop}
+            zoom={zoom}
+            aspect={1}
+            cropShape="round"
+            showGrid={false}
+            onCropChange={setCrop}
+            onZoomChange={setZoom}
+            onCropComplete={onCropComplete}
+          />
+        </div>
+
+        {/* Zoom slider */}
+        <div className="px-5 py-4 bg-gray-50 flex items-center gap-3">
+          <MdZoomOut className="text-gray-400 text-xl flex-shrink-0" />
+          <input
+            type="range" min={1} max={3} step={0.01}
+            value={zoom} onChange={(e) => setZoom(Number(e.target.value))}
+            className="flex-1 accent-blue-600 h-1.5 rounded-full cursor-pointer"
+          />
+          <MdZoomIn className="text-gray-400 text-xl flex-shrink-0" />
+        </div>
+
+        <div className="px-5 pb-5 flex gap-3">
+          <button onClick={onCancel}
+            className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-600 font-semibold text-sm hover:bg-gray-50 transition-colors">
+            Cancel
+          </button>
+          <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
+            onClick={handleConfirm}
+            className="flex-1 py-2.5 bg-gradient-to-r from-blue-600 to-violet-600 text-white rounded-xl font-semibold text-sm shadow-md shadow-blue-500/20 flex items-center justify-center gap-2">
+            <MdCheck /> Apply & Upload
+          </motion.button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
 
 const API_BASE = "http://localhost:8000";
 
@@ -30,15 +128,33 @@ export default function ProfilePage() {
   const [editing, setEditing] = useState(false);
   const [loading, setLoading] = useState(false);
   const [avatarLoading, setAvatarLoading] = useState(false);
+  const [cropSrc, setCropSrc] = useState(null);
   const fileRef = useRef(null);
   const [form, setForm] = useState({
     full_name: user?.full_name || "",
     phone: user?.phone || "",
     date_of_birth: user?.date_of_birth || "",
     joining_date: user?.joining_date || "",
+    gender: user?.gender || "",
     marital_status: user?.marital_status || "",
     marriage_date: user?.marriage_date || "",
   });
+
+  useEffect(() => {
+    getMe().then((r) => {
+      dispatch(updateUser(r.data));
+      setForm((f) => ({
+        ...f,
+        full_name: r.data.full_name || "",
+        phone: r.data.phone || "",
+        date_of_birth: r.data.date_of_birth || "",
+        joining_date: r.data.joining_date || "",
+        gender: r.data.gender || "",
+        marital_status: r.data.marital_status || "",
+        marriage_date: r.data.marriage_date || "",
+      }));
+    }).catch(() => {});
+  }, []);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -49,6 +165,7 @@ export default function ProfilePage() {
         phone: form.phone || undefined,
         date_of_birth: form.date_of_birth || undefined,
         joining_date: form.joining_date || undefined,
+        gender: form.gender || undefined,
         marital_status: form.marital_status || undefined,
         marriage_date: form.marital_status === "married" && form.marriage_date ? form.marriage_date : undefined,
       };
@@ -76,15 +193,24 @@ export default function ProfilePage() {
     }
   }
 
-  async function handleAvatarChange(e) {
+  function handleAvatarChange(e) {
     const file = e.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith("image/")) {
       toast.error("Please select an image file");
       return;
     }
+    const reader = new FileReader();
+    reader.onload = () => setCropSrc(reader.result);
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  }
+
+  async function handleCropConfirm(blob) {
+    setCropSrc(null);
     setAvatarLoading(true);
     try {
+      const file = new File([blob], "avatar.jpg", { type: "image/jpeg" });
       const res = await uploadAvatar(file);
       dispatch(updateUser(res.data));
       toast.success("Profile photo updated");
@@ -100,7 +226,7 @@ export default function ProfilePage() {
   const avatarSrc = user?.profile_image ? `${API_BASE}${user.profile_image}` : null;
 
   const infoItems = [
-    { icon: MdEmail,         label: "Email",          value: user?.email },
+    { icon: MdEmail,         label: "Email",          value: user?.email, fullWidth: true },
     { icon: MdPhone,         label: "Phone",          value: user?.phone || "Not set" },
     { icon: MdWork,          label: "Department",     value: user?.department?.name || "Not assigned" },
     { icon: MdCalendarMonth, label: "Joining Date",   value: user?.joining_date || "Not set" },
@@ -166,7 +292,7 @@ export default function ProfilePage() {
 
           <div className="flex-1 min-w-0">
             <h2 className="text-xl font-extrabold text-gray-900 truncate">{user?.full_name}</h2>
-            <p className="text-gray-400 text-sm truncate">{user?.email}</p>
+            <p className="text-gray-400 text-sm break-all">{user?.email}</p>
             <div className="flex items-center gap-2 mt-1.5 flex-wrap">
               <span className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold ${roleStyle.badge}`}>
                 <MdVerified className="text-sm" />
@@ -181,10 +307,20 @@ export default function ProfilePage() {
           </div>
         </div>
         <p className="text-xs text-gray-400 mt-3">
-          Click the <span className="text-blue-500 font-medium">camera icon</span> to upload a photo
+          Click the <span className="text-blue-500 font-medium">camera icon</span> to upload a photo — you can crop and adjust before saving
           {avatarSrc && <>, or the <span className="text-red-400 font-medium">red × icon</span> to remove it</>}.
         </p>
       </motion.div>
+
+      <AnimatePresence>
+        {cropSrc && (
+          <CropModal
+            src={cropSrc}
+            onConfirm={handleCropConfirm}
+            onCancel={() => setCropSrc(null)}
+          />
+        )}
+      </AnimatePresence>
 
       {/* Personal info */}
       <motion.div variants={fadeUp} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
@@ -204,13 +340,14 @@ export default function ProfilePage() {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {infoItems.map((item) => (
-            <motion.div key={item.label} whileHover={{ scale: 1.01 }} className="flex items-center gap-3 p-3.5 bg-gray-50 rounded-xl">
+            <motion.div key={item.label} whileHover={{ scale: 1.01 }}
+              className={`flex items-center gap-3 p-3.5 bg-gray-50 rounded-xl ${item.fullWidth ? "sm:col-span-2" : ""}`}>
               <div className="w-9 h-9 bg-white rounded-lg flex items-center justify-center shadow-sm flex-shrink-0">
                 <item.icon className="text-gray-500 text-lg" />
               </div>
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <p className="text-xs text-gray-400">{item.label}</p>
-                <p className="text-sm font-semibold text-gray-800 truncate">{item.value}</p>
+                <p className="text-sm font-semibold text-gray-800" style={{ overflowWrap: "anywhere" }}>{item.value}</p>
               </div>
             </motion.div>
           ))}
@@ -241,6 +378,25 @@ export default function ProfilePage() {
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-1.5">Joining Date</label>
                   <input type="date" value={form.joining_date} onChange={(e) => setForm({ ...form, joining_date: e.target.value })} className="input-field" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5">Gender</label>
+                <div className="flex gap-2">
+                  {["male", "female", "other"].map((g) => (
+                    <button
+                      key={g}
+                      type="button"
+                      onClick={() => setForm({ ...form, gender: g })}
+                      className={`flex-1 py-2 rounded-xl border-2 text-sm font-semibold capitalize transition-all ${
+                        form.gender === g
+                          ? "border-blue-500 bg-blue-50 text-blue-700"
+                          : "border-gray-200 text-gray-500 hover:border-gray-300"
+                      }`}
+                    >
+                      {g}
+                    </button>
+                  ))}
                 </div>
               </div>
               <div>
