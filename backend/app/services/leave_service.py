@@ -11,6 +11,11 @@ CARRY_FORWARD_MAX_DAYS = 7
 WEEKEND_WORK_PREFIX = "weekend work request:"
 
 
+def is_working_saturday(d: date) -> bool:
+    """2nd and 4th Saturdays of the month are working days."""
+    return ((d.day - 1) // 7 + 1) % 2 == 0
+
+
 def get_working_days(start: date, end: date, db: Session) -> float:
     holidays = db.query(Holiday).filter(
         Holiday.date.between(start, end),
@@ -21,7 +26,10 @@ def get_working_days(start: date, end: date, db: Session) -> float:
     count = 0.0
     current = start
     while current <= end:
-        if current.weekday() < 5 and current not in holiday_dates:
+        is_sunday = current.weekday() == 6
+        is_saturday = current.weekday() == 5
+        working_sat = is_saturday and is_working_saturday(current)
+        if not is_sunday and (not is_saturday or working_sat) and current not in holiday_dates:
             count += 1
         current += timedelta(days=1)
     return count

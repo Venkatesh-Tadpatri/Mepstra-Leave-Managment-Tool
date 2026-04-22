@@ -176,7 +176,13 @@ export default function ApplyLeavePage() {
       let cur = new Date(start);
       while (cur <= end) {
         const ds = format(cur, "yyyy-MM-dd");
-        if (cur.getDay() !== 0 && cur.getDay() !== 6 && !holidayDates.has(ds)) count++;
+        const day = cur.getDay();
+        const isSun = day === 0;
+        const isSat = day === 6;
+        // 2nd and 4th Saturdays are working days
+        const satNum = Math.ceil(cur.getDate() / 7);
+        const isWorkingSat = isSat && satNum % 2 === 0;
+        if (!isSun && (!isSat || isWorkingSat) && !holidayDates.has(ds)) count++;
         cur.setDate(cur.getDate() + 1);
       }
     }
