@@ -56,9 +56,9 @@ function DetailModal({ emp, year, month, onClose }) {
         {/* Stats row */}
         <div className="grid grid-cols-3 divide-x divide-gray-100 border-b border-gray-100">
           {[
-            { label: "Total Days", value: emp.count },
+            { label: "Total Days", value: dates.reduce((s, d) => s + (d.days || 1), 0) },
             { label: month === 0 ? "Year" : "Month", value: month === 0 ? year : MONTHS[month - 1] },
-            { label: "Shown", value: dates.length },
+            { label: "Requests", value: dates.length },
           ].map(({ label, value }) => (
             <div key={label} className="flex flex-col items-center py-3">
               <p className="text-lg font-extrabold text-gray-900">{value}</p>
@@ -78,7 +78,15 @@ function DetailModal({ emp, year, month, onClose }) {
               </div>
               <MdCalendarMonth className="text-sky-400 flex-shrink-0" />
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-gray-800">{fmtDate(d.date)}</p>
+                <p className="text-sm font-semibold text-gray-800">
+                  {fmtDate(d.date)}
+                  {d.end_date && d.end_date !== d.date && (
+                    <span className="text-gray-400 font-normal"> → {fmtDate(d.end_date)}</span>
+                  )}
+                  <span className="ml-2 text-xs font-bold text-sky-600 bg-sky-100 px-1.5 py-0.5 rounded-full">
+                    {d.days || 1} day{(d.days || 1) !== 1 ? "s" : ""}
+                  </span>
+                </p>
                 <p className="text-xs text-gray-400">Approved by <span className="font-semibold text-gray-600">{d.approved_by}</span></p>
               </div>
             </div>
@@ -115,14 +123,15 @@ export default function AdminWFHPage() {
 
   useEffect(() => { load(year); }, [year]);
 
-  // Filter employees by selected month
+  // Filter employees by selected month — sum actual days, not count requests
   const employees = (data?.employees || []).map((emp) => {
     if (month === 0) return emp;
     const filtered = emp.dates.filter((d) => {
       try { return parseISO(d.date).getMonth() + 1 === month; }
       catch { return false; }
     });
-    return { ...emp, dates: filtered, count: filtered.length };
+    const filteredDays = filtered.reduce((s, d) => s + (d.days || 1), 0);
+    return { ...emp, dates: filtered, count: filteredDays };
   }).filter((emp) => emp.count > 0);
 
   const filteredEmployees = employees.filter((e) =>
@@ -238,7 +247,7 @@ export default function AdminWFHPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search employee or department…"
-            className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 w-56"
+            className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 w-72"
           />
         </div>
 

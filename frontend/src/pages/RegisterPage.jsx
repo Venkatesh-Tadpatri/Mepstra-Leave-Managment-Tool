@@ -93,7 +93,7 @@ function MepstraLogo({ size = "md" }) {
   );
 }
 
-function InputField({ label, icon: Icon, error, ...props }) {
+function InputField({ label, icon: Icon, error, style, ...props }) {
   return (
     <div className="relative">
       <label className="block text-xs font-semibold text-gray-600 mb-1 uppercase tracking-wide">{label}</label>
@@ -101,6 +101,7 @@ function InputField({ label, icon: Icon, error, ...props }) {
         <Icon className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-base" />
         <input
           {...props}
+          style={style}
           className={`w-full pl-10 pr-3 py-2 text-sm border rounded-lg bg-white/80 backdrop-blur-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 transition-all ${
             error ? "border-red-400" : "border-gray-200"
           }`}
@@ -220,6 +221,7 @@ export default function RegisterPage() {
   function handleChange(e) {
     let { name, value } = e.target;
     if (name === "phone") value = value.replace(/\D/g, "").slice(0, 10);
+    if (name === "email") value = value.toLowerCase();
     if (name === "full_name") value = value.replace(/\b\w/g, (char) => char.toUpperCase());
     setForm((f) => ({ ...f, [name]: value }));
     if (errors[name]) setErrors((er) => ({ ...er, [name]: "" }));
@@ -661,7 +663,8 @@ export default function RegisterPage() {
 
               <div>
                 <InputField label={<>Email Address <span className="text-red-500">*</span></>} icon={MdEmail} type="email" name="email"
-                  value={form.email} onChange={handleChange} placeholder="you@mepstra.com" error={errors.email} required />
+                  value={form.email} onChange={handleChange} placeholder="you@mepstra.com" error={errors.email} required
+                  autoCapitalize="none" autoCorrect="off" spellCheck="false" style={{ textTransform: "lowercase" }} />
                 <p className="text-xs text-amber-600 mt-0.5 font-medium">⚠ Only pre-approved company emails can register.</p>
               </div>
 
@@ -908,23 +911,23 @@ export default function RegisterPage() {
                 <p className="text-sm font-bold text-teal-700 mb-3">📋 Review before submitting</p>
                 <div className="grid grid-cols-[130px_minmax(0,1fr)] sm:grid-cols-[150px_minmax(0,1fr)] gap-y-1.5 gap-x-3 text-sm">
                   {[
-                    ["Name",           form.full_name],
-                    ["Email",          form.email.trim().toLowerCase()],
-                    ["Phone",          form.phone || "—"],
-                    ["Role",           form.role.replace("_", " ")],
-                    ["Employment",     form.employment_type || "—"],
-                    ["Business Unit",  BUSINESS_UNITS.find((b) => b.value === form.business_unit)?.label || "—"],
-                    ["Department",     departments.find((d) => d.id === parseInt(form.department_id))?.name || "Not selected"],
-                    ["Manager",        managers.find((m) => m.id === parseInt(form.manager_id))?.full_name || "Not selected"],
-                    ["Gender",         form.gender || "—"],
-                    ["Marital Status", form.marital_status || "—"],
-                    ["Date of Birth",  form.date_of_birth || "—"],
-                    ["Joining Date",   form.joining_date || "—"],
-                    ...(form.marital_status === "married" ? [["Marriage Date", form.marriage_date || "—"]] : []),
-                  ].map(([key, val]) => (
+                    ["Name",           form.full_name,                                                                          "capitalize"],
+                    ["Email",          form.email.trim().toLowerCase(),                                                         "lowercase"],
+                    ["Phone",          form.phone || "—",                                                                       "normal-case"],
+                    ["Role",           form.role.replace("_", " "),                                                             "capitalize"],
+                    ["Employment",     form.employment_type || "—",                                                             "capitalize"],
+                    ["Business Unit",  BUSINESS_UNITS.find((b) => b.value === form.business_unit)?.label || "—",               "normal-case"],
+                    ["Department",     departments.find((d) => d.id === parseInt(form.department_id))?.name || "Not selected",  "normal-case"],
+                    ["Manager",        managers.find((m) => m.id === parseInt(form.manager_id))?.full_name || "Not selected",   "capitalize"],
+                    ["Gender",         form.gender || "—",                                                                      "capitalize"],
+                    ["Marital Status", form.marital_status || "—",                                                              "capitalize"],
+                    ["Date of Birth",  form.date_of_birth || "—",                                                               "normal-case"],
+                    ["Joining Date",   form.joining_date || "—",                                                                "normal-case"],
+                    ...(form.marital_status === "married" ? [["Marriage Date", form.marriage_date || "—", "normal-case"]] : []),
+                  ].map(([key, val, cls]) => (
                     <div key={key} className="contents">
                       <span className="text-gray-400 font-medium text-xs">{key}</span>
-                      <span className="font-semibold text-gray-800 break-words whitespace-normal capitalize text-xs">{val}</span>
+                      <span className={`font-semibold text-gray-800 break-words whitespace-normal text-xs ${cls}`}>{val}</span>
                     </div>
                   ))}
                 </div>

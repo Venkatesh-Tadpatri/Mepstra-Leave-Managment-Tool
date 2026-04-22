@@ -312,9 +312,16 @@ export default function ApplyLeavePage() {
       return;
     }
 
-    if (isCasual && !form.half_day && Number(form.requested_days || 0) !== Number(workingDays || 0)) {
-      toast.error(`Selected range has ${workingDays} working day(s). It must match requested ${form.requested_days} day(s).`);
-      return;
+    const isAbove7 = Number(form.requested_days) === 8;
+    if (isCasual && !form.half_day) {
+      if (isAbove7 ? workingDays <= 7 : Number(form.requested_days || 0) !== Number(workingDays || 0)) {
+        toast.error(
+          isAbove7
+            ? `Selected range has ${workingDays} working day(s). Above 7 days option requires more than 7 working days.`
+            : `Selected range has ${workingDays} working day(s). It must match requested ${form.requested_days} day(s).`
+        );
+        return;
+      }
     }
     if (!isWeekendRequest && advanceWarning.startsWith("advance notice required")) {
       toast.error("Cannot apply — advance notice period not met. Ask your manager to enable override.");

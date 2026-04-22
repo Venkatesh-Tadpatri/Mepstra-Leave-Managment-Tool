@@ -36,7 +36,7 @@ export default function WFHPage() {
   const load = () => {
     setLoading(true);
     getMyWFH()
-      .then((r) => setRequests(r.data))
+      .then((r) => setRequests((r.data || []).filter((w) => w.status !== "cancelled")))
       .catch(() => toast.error("Failed to load WFH requests"))
       .finally(() => setLoading(false));
   };
@@ -115,7 +115,7 @@ export default function WFHPage() {
                         </span>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
-                        {r.status !== "pending" && r.manager ? (
+                        {(r.status === "approved" || r.status === "rejected") && r.manager ? (
                           <div className="flex items-center gap-2">
                             <div className="w-7 h-7 rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
                               {r.manager.full_name.charAt(0).toUpperCase()}
@@ -125,7 +125,7 @@ export default function WFHPage() {
                         ) : <span className="text-gray-400">—</span>}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
-                        {r.manager_action_at ? (
+                        {(r.status === "approved" || r.status === "rejected") && r.manager_action_at ? (
                           <div className="flex flex-col">
                             <span className="text-gray-700 text-sm">{fmtDateTime(r.manager_action_at).split(", ")[0]}</span>
                             <span className="text-gray-400 text-xs">{fmtDateTime(r.manager_action_at).split(", ")[1]}</span>

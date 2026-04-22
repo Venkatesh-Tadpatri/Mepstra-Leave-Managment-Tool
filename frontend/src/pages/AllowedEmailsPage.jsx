@@ -459,7 +459,7 @@ export default function AllowedEmailsPage() {
                         const val = e.target.value.replace(/\b\w/g, (c) => c.toUpperCase());
                         setForm((f) => ({ ...f, employee_name: val }));
                       }}
-                      placeholder="e.g. Venkatesh Tadpatri"
+                      placeholder="e.g. John Doe"
                       required
                       className="input-field text-sm pl-9"
                       autoFocus

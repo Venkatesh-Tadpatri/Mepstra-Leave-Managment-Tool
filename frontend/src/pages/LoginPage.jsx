@@ -160,7 +160,7 @@ export default function LoginPage() {
                   {ic.icon}
                 </motion.div>
               ))}
-              <span className="text-white/80 text-[10px] font-semibold ml-1">+more</span>
+              <span className="text-white/80 text-[10px] font-semibold ml-1"></span>
             </div>
           </div>
         </motion.div>

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from app.db.database import get_db
@@ -80,7 +80,7 @@ def login_swagger(form: OAuth2PasswordRequestForm = Depends(), db: Session = Dep
 
 
 @router.post("/send-otp", status_code=200)
-def send_otp(data: OTPSendRequest, db: Session = Depends(get_db)):
+def send_otp(data: OTPSendRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     """Send a 6-digit OTP to the given email for registration verification."""
     email = data.email.strip().lower()
 
@@ -113,11 +113,8 @@ def send_otp(data: OTPSendRequest, db: Session = Depends(get_db)):
         "verified": False,
     }
 
-    # Send via email (falls back gracefully if SMTP not configured)
-    try:
-        send_otp_email(email, otp)
-    except Exception as e:
-        logger.warning("OTP email failed: %s", e)
+    # Send email in background — response returns immediately, no waiting for SMTP
+    background_tasks.add_task(send_otp_email, email, otp)
 
     # Always log OTP to console for development convenience
     logger.info("OTP for %s: %s", email, otp)

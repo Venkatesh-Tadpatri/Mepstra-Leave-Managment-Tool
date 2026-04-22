@@ -8,22 +8,12 @@ from app.api.deps import get_current_user
 from app.schemas.schemas import WFHCreate, WFHUpdate, WFHResponse
 from app.models.models import WorkFromHomeRequest, WFHStatus, User, UserRole, Department
 from app.services.email_service import send_wfh_request_email, send_wfh_status_email
+from app.services.leave_service import get_working_days
 import logging
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/wfh", tags=["Work From Home"])
-
-
-def _working_days(start: date, end: date) -> float:
-    from datetime import timedelta
-    count = 0.0
-    cur = start
-    while cur <= end:
-        if cur.weekday() < 5:
-            count += 1
-        cur += timedelta(days=1)
-    return max(count, 1.0)
 
 
 def _serialize(req: WorkFromHomeRequest) -> dict:
@@ -69,7 +59,7 @@ def submit_wfh(
     current_user: User = Depends(get_current_user),
 ):
     """Employee submits a WFH request."""
-    days = _working_days(data.start_date, data.end_date)
+    days = get_working_days(data.start_date, data.end_date, db)
     req = WorkFromHomeRequest(
         user_id=current_user.id,
         start_date=data.start_date,
@@ -287,14 +277,12 @@ def wfh_report(
 
     reqs = q.order_by(WorkFromHomeRequest.start_date.asc()).all()
 
-    # Monthly breakdown
-    monthly = {}
-    for m in range(1, 13):
-        monthly[m] = 0
+    # Monthly breakdown — sum actual days per month
+    monthly = {m: 0.0 for m in range(1, 13)}
     for r in reqs:
-        monthly[r.start_date.month] += 1
+        monthly[r.start_date.month] += r.total_days
 
-    # Per-employee summary
+    # Per-employee summary — sum actual days
     emp_map: dict[int, dict] = {}
     for r in reqs:
         uid = r.user_id
@@ -302,19 +290,21 @@ def wfh_report(
             emp_map[uid] = {
                 "employee_name": r.user.full_name if r.user else "—",
                 "department": r.user.department.name if r.user and r.user.department else "—",
-                "count": 0,
+                "count": 0.0,
                 "dates": [],
             }
-        emp_map[uid]["count"] += 1
+        emp_map[uid]["count"] += r.total_days
         approved_by = r.manager.full_name if r.manager else "—"
         emp_map[uid]["dates"].append({
             "date": str(r.start_date),
+            "end_date": str(r.end_date),
+            "days": r.total_days,
             "approved_by": approved_by,
         })
 
     return {
         "year": y,
-        "total": len(reqs),
+        "total": sum(r.total_days for r in reqs),
         "monthly": [{"month": m, "count": monthly[m]} for m in range(1, 13)],
         "employees": list(emp_map.values()),
         "records": [_serialize(r) for r in reqs],
