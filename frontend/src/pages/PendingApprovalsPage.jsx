@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { fetchPending } from "../store/slices/leaveSlice";
+import { fetchPending, fetchPendingWFH } from "../store/slices/leaveSlice";
 import { actionLeave, getPendingWFH, actionWFH, getLeaves, getMyWFH } from "../services/api";
 import toast from "react-hot-toast";
 import { motion, AnimatePresence } from "framer-motion";
@@ -20,10 +20,16 @@ const LEAVE_TYPE_STYLES = {
 const fadeUp = { hidden: { opacity: 0, y: 16 }, show: { opacity: 1, y: 0, transition: { duration: 0.35 } } };
 const stagger = { show: { transition: { staggerChildren: 0.07 } } };
 
+function fmtLeaveType(type) {
+  if (!type) return "";
+  if (type === "lop") return "LOP";
+  return type.charAt(0).toUpperCase() + type.slice(1);
+}
+
 function getLeaveTypeLabel(leave) {
-  if (leave.leave_type !== "special") return leave.leave_type;
+  if (leave.leave_type !== "special") return fmtLeaveType(leave.leave_type);
   const isWeekendReq = (leave.reason || "").toLowerCase().startsWith("weekend work request:");
-  return isWeekendReq ? "weekend work request" : "compensate leave";
+  return isWeekendReq ? "Weekend Work Request" : "Compensate Leave";
 }
 
 function ActionModal({ leave, onClose, onAction }) {
@@ -267,7 +273,10 @@ export default function PendingApprovalsPage() {
     if (isEmployee) return;
     setWfhLoading(true);
     getPendingWFH()
-      .then((r) => setWfhPending(r.data))
+      .then((r) => {
+        setWfhPending(r.data);
+        dispatch(fetchPendingWFH());
+      })
       .catch(() => {})
       .finally(() => setWfhLoading(false));
   }, [isEmployee]);
@@ -287,6 +296,7 @@ export default function PendingApprovalsPage() {
       await actionWFH(id, { action, comment });
       toast.success(`WFH request ${action}d successfully`);
       setWfhPending((prev) => prev.filter((r) => r.id !== id));
+      dispatch(fetchPendingWFH());
     } catch (err) {
       toast.error(err.response?.data?.detail || `Failed to ${action} WFH request`);
     }
@@ -401,7 +411,7 @@ export default function PendingApprovalsPage() {
                           </p>
                         </div>
                         <span className={`flex-shrink-0 px-3 py-1 rounded-full text-xs font-semibold capitalize ${lc.bg} ${lc.text}`}>
-                          {leave.leave_type === "special" ? getLeaveTypeLabel(leave) : `${leave.leave_type} Leave`}
+                          {leave.leave_type === "special" ? getLeaveTypeLabel(leave) : `${fmtLeaveType(leave.leave_type)} Leave`}
                         </span>
                       </div>
                       <div className="flex flex-wrap items-center gap-3 mt-3">

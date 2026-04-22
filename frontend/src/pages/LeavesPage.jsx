@@ -2,10 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { fetchLeaves, fetchBalance } from "../store/slices/leaveSlice";
-import { getLeaves } from "../services/api";
+import { getLeaves, cancelLeave } from "../services/api";
 import { motion, AnimatePresence } from "framer-motion";
-import { MdAdd, MdFilterList, MdClose, MdEventNote, MdBeachAccess, MdLocalHospital, MdStar } from "react-icons/md";
+import { MdAdd, MdFilterList, MdClose, MdEventNote, MdBeachAccess, MdLocalHospital, MdStar, MdWarning, MdCancel } from "react-icons/md";
 import { format, parseISO } from "date-fns";
+import toast from "react-hot-toast";
 
 const LEAVE_COLORS = {
   casual:    { bg: "bg-blue-100",   text: "text-blue-700",   dot: "#3b82f6" },
@@ -31,15 +32,66 @@ const BALANCE_CARDS = [
   { key: "optional",  label: "Optional",  icon: MdStar,           color: "#f59e0b", gradient: "from-amber-500 to-amber-600",  bg: "from-amber-50 to-amber-100" },
 ];
 
+function fmtLeaveType(type) {
+  if (!type) return "";
+  if (type === "lop") return "LOP";
+  return type.charAt(0).toUpperCase() + type.slice(1);
+}
+
 function getLeaveTypeLabel(leave) {
-  if (leave.leave_type !== "special") return leave.leave_type;
+  if (leave.leave_type !== "special") return fmtLeaveType(leave.leave_type);
   const isWeekendReq = (leave.reason || "").toLowerCase().startsWith("weekend work request:");
-  return isWeekendReq ? "weekend work request" : "compensate leave";
+  return isWeekendReq ? "Weekend Work Request" : "Compensate Leave";
 }
 
 const fadeUp = { hidden: { opacity: 0, y: 16 }, show: { opacity: 1, y: 0, transition: { duration: 0.35 } } };
 const stagger = { show: { transition: { staggerChildren: 0.08 } } };
 const fmtDays = (n) => Number.isInteger(Number(n)) ? Number(n) : Number(n).toFixed(1);
+
+function CancelConfirmModal({ leave, onConfirm, onCancel }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+      onClick={onCancel}
+    >
+      <motion.div
+        initial={{ opacity: 0, scale: 0.92, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.92 }}
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex flex-col items-center px-6 pt-7 pb-2 text-center">
+          <div className="w-14 h-14 rounded-full bg-orange-100 flex items-center justify-center mb-4">
+            <MdWarning className="text-orange-500 text-3xl" />
+          </div>
+          <h3 className="text-base font-extrabold text-gray-900 mb-1">Withdraw Leave Request</h3>
+          <p className="text-sm text-gray-500">
+            Are you sure you want to withdraw your{" "}
+            <span className="font-semibold text-gray-800">{fmtLeaveType(leave?.leave_type)} Leave</span>{" "}
+            from <span className="font-semibold text-gray-800">{leave?.start_date}</span> to{" "}
+            <span className="font-semibold text-gray-800">{leave?.end_date}</span>?
+          </p>
+        </div>
+        <div className="flex gap-3 px-6 py-5">
+          <button
+            onClick={onCancel}
+            className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
+          >
+            Keep Leave
+          </button>
+          <button
+            onClick={onConfirm}
+            className="flex-1 py-2.5 rounded-xl bg-orange-500 text-white text-sm font-semibold hover:bg-orange-600 transition-colors"
+          >
+            Yes, Withdraw
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
 
 export default function LeavesPage() {
   const dispatch = useDispatch();
@@ -47,6 +99,8 @@ export default function LeavesPage() {
   const { list, balance, loading } = useSelector((s) => s.leaves);
   const [filter, setFilter] = useState({ status: "", leave_type: "", year: new Date().getFullYear() });
   const [yearLeaves, setYearLeaves] = useState([]);
+  const [cancelTarget, setCancelTarget] = useState(null);
+  const [cancelling, setCancelling] = useState(false);
 
   useEffect(() => {
     dispatch(fetchLeaves(filter));
@@ -58,6 +112,22 @@ export default function LeavesPage() {
       .then((res) => setYearLeaves(res.data || []))
       .catch(() => setYearLeaves([]));
   }, [filter.year]);
+
+  async function handleConfirmCancel() {
+    const leave = cancelTarget;
+    setCancelTarget(null);
+    setCancelling(true);
+    try {
+      await cancelLeave(leave.id);
+      toast.success("Leave request withdrawn successfully");
+      dispatch(fetchLeaves(filter));
+      dispatch(fetchBalance(filter.year));
+    } catch (err) {
+      toast.error(err.response?.data?.detail || "Failed to cancel leave");
+    } finally {
+      setCancelling(false);
+    }
+  }
 
   const appliedByType = useMemo(() => {
     const byType = {};
@@ -188,7 +258,7 @@ export default function LeavesPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-100">
-                  {["#", "Type", "From", "To", "Days", "Reason", "Status", "Remarks", "Approved By", "Approved On", "Applied On"].map((h) => (
+                  {["#", "Type", "From", "To", "Days", "Reason", "Status", "Remarks", "Approved By", "Approved On", "Applied On", "Action"].map((h) => (
                     <th key={h} className="px-4 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">{h}</th>
                   ))}
                 </tr>
@@ -241,6 +311,7 @@ export default function LeavesPage() {
                       </td>
                       <td className="px-4 py-3.5">
                         {(() => {
+                          if (l.status === "pending") return <span className="text-gray-300 text-xs">—</span>;
                           const approver = l.main_manager || l.manager;
                           return approver ? (
                             <div className="flex items-center gap-1.5">
@@ -268,6 +339,17 @@ export default function LeavesPage() {
                       <td className="px-4 py-3.5 text-gray-400 text-xs whitespace-nowrap">
                         {format(new Date(l.created_at), "dd MMM yyyy")}
                       </td>
+                      <td className="px-4 py-3.5">
+                        {l.status === "pending" && (
+                          <button
+                            onClick={() => setCancelTarget(l)}
+                            disabled={cancelling}
+                            className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-orange-600 bg-orange-50 hover:bg-orange-100 border border-orange-200 rounded-lg transition-colors disabled:opacity-50"
+                          >
+                            <MdCancel className="text-sm" /> Cancel
+                          </button>
+                        )}
+                      </td>
                     </motion.tr>
                   );
                 })}
@@ -276,6 +358,16 @@ export default function LeavesPage() {
           </div>
         )}
       </motion.div>
+
+      <AnimatePresence>
+        {cancelTarget && (
+          <CancelConfirmModal
+            leave={cancelTarget}
+            onConfirm={handleConfirmCancel}
+            onCancel={() => setCancelTarget(null)}
+          />
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }

@@ -196,7 +196,11 @@ class AllowedEmail(Base):
     gmail = Column(String(255), unique=True, nullable=True, index=True)
     email = Column(String(255), nullable=True)   # legacy column — kept so existing rows are not lost
     notes = Column(String(255), nullable=True)
+    casual_leaves = Column(Float, default=12.0)
+    sick_leaves = Column(Float, default=6.0)
+    optional_leaves = Column(Float, default=2.0)
     added_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    registered_user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 

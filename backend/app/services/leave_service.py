@@ -46,7 +46,14 @@ def has_weekday_in_range(start: date, end: date) -> bool:
     return False
 
 
-def get_or_create_balance(user_id: int, year: int, db: Session) -> LeaveBalance:
+def get_or_create_balance(
+    user_id: int,
+    year: int,
+    db: Session,
+    casual_total: float = 12.0,
+    sick_total: float = 6.0,
+    optional_total: float = 2.0,
+) -> LeaveBalance:
     balance = db.query(LeaveBalance).filter(
         LeaveBalance.user_id == user_id,
         LeaveBalance.year == year
@@ -66,7 +73,9 @@ def get_or_create_balance(user_id: int, year: int, db: Session) -> LeaveBalance:
         balance = LeaveBalance(
             user_id=user_id,
             year=year,
-            casual_total=12.0 + carried_forward,  # base 12 + carried forward
+            casual_total=casual_total + carried_forward,
+            sick_total=sick_total,
+            optional_total=optional_total,
         )
         db.add(balance)
         db.commit()
@@ -245,6 +254,9 @@ def create_leave_request(user_id: int, data: LeaveRequestCreate, db: Session):
             total_days = 0.5
         if total_days <= 0:
             raise ValueError("Select at least one weekend day for weekend work request.")
+    elif data.leave_type in (LeaveType.MATERNITY, LeaveType.PATERNITY):
+        # Maternity/Paternity counts all calendar days including weekends & holidays
+        total_days = (data.end_date - data.start_date).days + 1
     else:
         total_days = get_working_days(data.start_date, data.end_date, db)
         if data.half_day:
@@ -256,6 +268,35 @@ def create_leave_request(user_id: int, data: LeaveRequestCreate, db: Session):
     )
     if not ok_notice:
         raise ValueError(notice_msg)
+
+    # Optional leave: must be on a declared optional holiday date
+    if data.leave_type == LeaveType.OPTIONAL:
+        if data.start_date != data.end_date:
+            raise ValueError("Optional leave must be a single-day request — select one optional holiday.")
+        optional_holiday = db.query(Holiday).filter(
+            Holiday.date == data.start_date,
+            Holiday.holiday_type == HolidayType.OPTIONAL,
+        ).first()
+        if not optional_holiday:
+            raise ValueError(
+                f"{data.start_date} is not a declared optional holiday. "
+                "Optional leave can only be taken on the optional holidays listed in the company calendar."
+            )
+
+    # Check for overlapping leave on the same dates (pending or already approved)
+    if not is_weekend_work_request:
+        overlap = db.query(LeaveRequest).filter(
+            LeaveRequest.user_id == user_id,
+            LeaveRequest.status.in_([LeaveStatus.PENDING, LeaveStatus.APPROVED, LeaveStatus.APPROVED_BY_MANAGER]),
+            LeaveRequest.start_date <= data.end_date,
+            LeaveRequest.end_date >= data.start_date,
+        ).first()
+        if overlap:
+            raise ValueError(
+                f"You already have a {overlap.status.value.replace('_', ' ')} "
+                f"{overlap.leave_type.value} leave from {overlap.start_date} to {overlap.end_date} "
+                f"overlapping the selected dates."
+            )
 
     if not is_weekend_work_request:
         year = data.start_date.year

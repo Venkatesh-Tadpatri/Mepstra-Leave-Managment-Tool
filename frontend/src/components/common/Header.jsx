@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { MdMenu, MdNotifications, MdLogout, MdPerson } from "react-icons/md";
 import { toggleSidebar } from "../../store/slices/uiSlice";
 import { logout } from "../../store/slices/authSlice";
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 
 const ROLE_COLORS = {
   admin: "from-red-500 to-pink-500",
@@ -19,8 +19,21 @@ export default function Header() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { user } = useSelector((s) => s.auth);
-  const { pending } = useSelector((s) => s.leaves);
+  const { pending, pendingWFH } = useSelector((s) => s.leaves);
+  const totalPending = (pending?.length || 0) + (pendingWFH?.length || 0);
   const [dropOpen, setDropOpen] = useState(false);
+  const dropRef = useRef(null);
+
+  useEffect(() => {
+    if (!dropOpen) return;
+    function handleClickOutside(e) {
+      if (dropRef.current && !dropRef.current.contains(e.target)) {
+        setDropOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [dropOpen]);
 
   const gradient = ROLE_COLORS[user?.role] || "from-blue-500 to-indigo-500";
 
@@ -48,7 +61,7 @@ export default function Header() {
               👋
             </motion.span>
           </p>
-          <p className="text-xs text-gray-400 capitalize">{user?.role?.replace(/_/g, " ")} · {user?.department?.name || "Mepstra"}</p>
+          <p className="text-xs text-gray-400 capitalize">{user?.role === "hr" ? "HR/Admin" : user?.role?.replace(/_/g, " ")} · {user?.department?.name || "Mepstra"}</p>
         </div>
       </div>
 
@@ -57,23 +70,23 @@ export default function Header() {
           whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
           onClick={() => navigate("/approvals")}
           className={`relative p-2.5 rounded-xl transition-colors ${
-            pending?.length > 0
+            totalPending > 0
               ? "bg-orange-50 text-orange-500 hover:bg-orange-100"
               : "bg-gray-100 text-gray-400 hover:bg-gray-200"
           }`}
         >
           <MdNotifications className="text-xl" />
-          {pending?.length > 0 && (
+          {totalPending > 0 && (
             <motion.span
               initial={{ scale: 0 }} animate={{ scale: 1 }}
               className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500 text-white text-[10px] rounded-full flex items-center justify-center font-bold shadow"
             >
-              {pending.length}
+              {totalPending}
             </motion.span>
           )}
         </motion.button>
 
-        <div className="relative">
+        <div className="relative" ref={dropRef}>
           <motion.button
             whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
             onClick={() => setDropOpen(!dropOpen)}
@@ -92,7 +105,7 @@ export default function Header() {
             )}
             <div className="hidden sm:block text-left max-w-[120px]">
               <p className="text-xs font-semibold text-gray-800 leading-tight truncate">{user?.full_name}</p>
-              <p className="text-xs text-gray-400 capitalize leading-tight">{user?.role?.replace(/_/g, " ")}</p>
+              <p className="text-xs text-gray-400 capitalize leading-tight">{user?.role === "hr" ? "HR/Admin" : user?.role?.replace(/_/g, " ")}</p>
             </div>
           </motion.button>
 

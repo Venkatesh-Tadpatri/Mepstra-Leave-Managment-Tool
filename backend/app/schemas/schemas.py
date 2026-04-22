@@ -1,3 +1,4 @@
+import re
 from pydantic import BaseModel, EmailStr, field_validator, model_validator
 from typing import Optional, List
 from datetime import date, datetime
@@ -290,6 +291,9 @@ class AllowedEmailCreate(BaseModel):
     outlook_email: Optional[str] = None
     gmail: Optional[str] = None
     notes: Optional[str] = None
+    casual_leaves: float = 12.0
+    sick_leaves: float = 6.0
+    optional_leaves: float = 2.0
 
     @field_validator("outlook_email", "gmail", mode="before")
     @classmethod
@@ -315,6 +319,9 @@ class AllowedEmailUpdate(BaseModel):
     outlook_email: Optional[str] = None
     gmail: Optional[str] = None
     notes: Optional[str] = None
+    casual_leaves: Optional[float] = None
+    sick_leaves: Optional[float] = None
+    optional_leaves: Optional[float] = None
 
     @field_validator("outlook_email", "gmail", mode="before")
     @classmethod
@@ -328,6 +335,9 @@ class AllowedEmailResponse(BaseModel):
     outlook_email: Optional[str] = None
     gmail: Optional[str] = None
     notes: Optional[str] = None
+    casual_leaves: float = 12.0
+    sick_leaves: float = 6.0
+    optional_leaves: float = 2.0
     created_at: datetime
 
     model_config = {"from_attributes": True}

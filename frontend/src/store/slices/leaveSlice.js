@@ -11,6 +11,11 @@ export const fetchPending = createAsyncThunk("leaves/pending", async () => {
   return res.data;
 });
 
+export const fetchPendingWFH = createAsyncThunk("leaves/pendingWFH", async () => {
+  const res = await api.getPendingWFH();
+  return res.data;
+});
+
 export const fetchBalance = createAsyncThunk("leaves/balance", async (year) => {
   const res = await api.getMyBalance(year);
   return res.data;
@@ -21,6 +26,7 @@ const leaveSlice = createSlice({
   initialState: {
     list: [],
     pending: [],
+    pendingWFH: [],
     balance: null,
     loading: false,
     error: null,
@@ -32,6 +38,7 @@ const leaveSlice = createSlice({
       .addCase(fetchLeaves.fulfilled, (s, a) => { s.loading = false; s.list = a.payload; })
       .addCase(fetchLeaves.rejected, (s) => { s.loading = false; })
       .addCase(fetchPending.fulfilled, (s, a) => { s.pending = a.payload; })
+      .addCase(fetchPendingWFH.fulfilled, (s, a) => { s.pendingWFH = a.payload; })
       .addCase(fetchBalance.fulfilled, (s, a) => { s.balance = a.payload; });
   },
 });

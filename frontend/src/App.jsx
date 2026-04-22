@@ -18,6 +18,7 @@ import ProfilePage from "./pages/ProfilePage";
 import DepartmentsPage from "./pages/DepartmentsPage";
 import AllowedEmailsPage from "./pages/AllowedEmailsPage";
 import WFHPage from "./pages/WFHPage";
+import AdminWFHPage from "./pages/AdminWFHPage";
 
 function PrivateRoute({ children }) {
   const { isAuthenticated, token } = useSelector((s) => s.auth);
@@ -58,6 +59,7 @@ export default function App() {
           <Route path="departments" element={<DepartmentsPage />} />
           <Route path="allowed-emails" element={<AllowedEmailsPage />} />
           <Route path="wfh" element={<WFHPage />} />
+          <Route path="admin-wfh" element={<AdminWFHPage />} />
           <Route path="profile" element={<ProfilePage />} />
         </Route>
         <Route path="*" element={<Navigate to="/dashboard" replace />} />

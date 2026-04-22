@@ -2,10 +2,11 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
 from typing import List
+from datetime import date
 from app.db.database import get_db
 from app.api.deps import require_admin_or_hr, get_current_user
 from app.schemas.schemas import AllowedEmailCreate, AllowedEmailUpdate, AllowedEmailResponse
-from app.models.models import AllowedEmail, User, UserRole
+from app.models.models import AllowedEmail, User, UserRole, LeaveBalance
 
 router = APIRouter(prefix="/allowed-emails", tags=["Allowed Emails"])
 
@@ -40,6 +41,9 @@ def add_allowed_email(
         outlook_email=data.outlook_email,
         gmail=data.gmail,
         notes=data.notes,
+        casual_leaves=data.casual_leaves,
+        sick_leaves=data.sick_leaves,
+        optional_leaves=data.optional_leaves,
         added_by_id=current_user.id,
     )
     db.add(entry)
@@ -81,8 +85,36 @@ def update_allowed_email(
     if data.notes is not None:
         entry.notes = data.notes or None
 
+    leave_changed = False
+    if data.casual_leaves is not None:
+        entry.casual_leaves = data.casual_leaves
+        leave_changed = True
+    if data.sick_leaves is not None:
+        entry.sick_leaves = data.sick_leaves
+        leave_changed = True
+    if data.optional_leaves is not None:
+        entry.optional_leaves = data.optional_leaves
+        leave_changed = True
+
     db.commit()
     db.refresh(entry)
+
+    # Sync leave balance for the registered user for the current year
+    if leave_changed and entry.registered_user_id:
+        year = date.today().year
+        balance = db.query(LeaveBalance).filter(
+            LeaveBalance.user_id == entry.registered_user_id,
+            LeaveBalance.year == year,
+        ).first()
+        if balance:
+            if data.casual_leaves is not None:
+                balance.casual_total = data.casual_leaves
+            if data.sick_leaves is not None:
+                balance.sick_total = data.sick_leaves
+            if data.optional_leaves is not None:
+                balance.optional_total = data.optional_leaves
+            db.commit()
+
     return entry
 
 

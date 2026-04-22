@@ -39,6 +39,11 @@
       "business_unit": "MEPSTRA_ENGINEERING_CONSULTANCY",
       "name": "HR/Admin",
       "description": "HR and Administration team"
+    },
+    {
+      "business_unit": "MEPSTRA_ENGINEERING_CONSULTANCY",
+      "name": "Managment",
+      "description": "Managing Director"
     }
   ],
 
@@ -50,7 +55,7 @@
       "role": "ADMIN",
       "employment_type": "PERMANENT",
       "business_unit": "MEPSTRA_ENGINEERING_CONSULTANCY",
-      "department": "Mechanical Engineering",
+      "department": "Managment",
       "joining_date": "2020-01-01",
       "manager": null,
       "hr": null

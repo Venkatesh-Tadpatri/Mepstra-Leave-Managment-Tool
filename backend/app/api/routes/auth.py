@@ -19,7 +19,7 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 # ─── In-memory OTP store: email -> {"otp": str, "expires": datetime, "verified": bool}
 _otp_store: dict = {}
 
-OTP_EXPIRY_SECONDS = 150  # 2 minutes 30 seconds
+OTP_EXPIRY_SECONDS = 120  # 2 minutes
 
 
 def _generate_otp() -> str:
@@ -121,7 +121,7 @@ def send_otp(data: OTPSendRequest, db: Session = Depends(get_db)):
 
     # Always log OTP to console for development convenience
     logger.info("OTP for %s: %s", email, otp)
-    print(f"\n>>> OTP for {email}: {otp} (valid 2 min 30 sec) <<<\n")
+    print(f"\n>>> OTP for {email}: {otp} (valid 2 min) <<<\n")
 
     return {"message": "OTP sent to your email address", "expires_in_seconds": OTP_EXPIRY_SECONDS}
 
@@ -158,18 +158,19 @@ def register(data: UserCreate, db: Session = Depends(get_db)):
             raise HTTPException(status_code=400, detail="OTP session expired. Please request a new OTP.")
 
     # Check against allowed email whitelist (if the list is non-empty, only those emails may register)
+    whitelist_entry = None
     allowed_count = db.query(AllowedEmail).count()
     if allowed_count > 0:
-        allowed = db.query(AllowedEmail).filter(
+        whitelist_entry = db.query(AllowedEmail).filter(
             or_(AllowedEmail.outlook_email == email, AllowedEmail.gmail == email)
         ).first()
-        if not allowed:
+        if not whitelist_entry:
             raise HTTPException(
                 status_code=400,
                 detail="Your email is not in the approved registration list. Please contact the administrator."
             )
         # Block if the other email for the same employee is already registered
-        other = allowed.gmail if allowed.outlook_email == email else allowed.outlook_email
+        other = whitelist_entry.gmail if whitelist_entry.outlook_email == email else whitelist_entry.outlook_email
         if other and db.query(User).filter(User.email == other).first():
             raise HTTPException(
                 status_code=400,
@@ -216,7 +217,19 @@ def register(data: UserCreate, db: Session = Depends(get_db)):
     db.add(user)
     db.commit()
     db.refresh(user)
-    get_or_create_balance(user.id, date.today().year, db)
+    get_or_create_balance(
+        user.id,
+        date.today().year,
+        db,
+        casual_total=whitelist_entry.casual_leaves if whitelist_entry else 12.0,
+        sick_total=whitelist_entry.sick_leaves if whitelist_entry else 6.0,
+        optional_total=whitelist_entry.optional_leaves if whitelist_entry else 2.0,
+    )
+
+    # Link whitelist entry to the registered user for future balance syncs
+    if whitelist_entry:
+        whitelist_entry.registered_user_id = user.id
+        db.commit()
 
     # Clean up OTP record after successful registration
     if email in _otp_store:

@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { getDepartments, createDepartment, updateDepartment, deleteDepartment, getUsers } from "../services/api";
+import { getDepartments, createDepartment, updateDepartment, getUsers } from "../services/api";
 import toast from "react-hot-toast";
 import { motion, AnimatePresence } from "framer-motion";
-import { MdAdd, MdEdit, MdDelete, MdClose, MdPeople, MdBusinessCenter } from "react-icons/md";
+import { MdAdd, MdEdit, MdClose, MdPeople, MdBusinessCenter, MdFilterList } from "react-icons/md";
 
 const BUSINESS_UNITS = [
   { value: "mepstra_power_solutions", label: "Mepstra Power Solutions" },
@@ -30,6 +30,7 @@ export default function DepartmentsPage() {
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState({ name: "", business_unit: "mepstra_power_solutions", description: "" });
   const [loading, setLoading] = useState(false);
+  const [buFilter, setBuFilter] = useState("");
 
   async function load() {
     const [dRes, uRes] = await Promise.all([getDepartments(), getUsers()]);
@@ -77,36 +78,51 @@ export default function DepartmentsPage() {
     }
   }
 
-  async function handleDelete(id) {
-    if (!confirm("Delete this department?")) return;
-    try {
-      await deleteDepartment(id);
-      toast.success("Department deleted");
-      load();
-    } catch (err) {
-      toast.error(err.response?.data?.detail || "Failed");
-    }
-  }
+  const filteredDepts = buFilter
+    ? departments.filter((d) => d.business_unit === buFilter)
+    : departments;
+
+  const filteredEmployeeCount = buFilter
+    ? users.filter((u) => filteredDepts.some((d) => d.id === u.department_id)).length
+    : users.length;
 
   return (
     <motion.div initial="hidden" animate="show" variants={stagger} className="space-y-6">
 
       {/* Header */}
-      <motion.div variants={fadeUp} className="flex items-center justify-between">
+      <motion.div variants={fadeUp} className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-extrabold text-gray-900">Departments</h1>
-          <p className="text-gray-400 text-sm mt-0.5">{departments.length} departments · {users.length} total employees</p>
+          <p className="text-gray-400 text-sm mt-0.5">
+            {filteredDepts.length} department{filteredDepts.length !== 1 ? "s" : ""} · {filteredEmployeeCount} total employees
+          </p>
         </div>
-        <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
-          onClick={openCreate}
-          className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-600 to-violet-600 text-white rounded-xl font-semibold shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 transition-shadow text-sm">
-          <MdAdd className="text-lg" /> Add Department
-        </motion.button>
+        <div className="flex items-center gap-3">
+          {/* Business Unit Filter */}
+          <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-3 py-2 shadow-sm">
+            <MdFilterList className="text-gray-400 text-lg flex-shrink-0" />
+            <select
+              value={buFilter}
+              onChange={(e) => setBuFilter(e.target.value)}
+              className="text-sm font-medium text-gray-700 bg-transparent outline-none cursor-pointer pr-1"
+            >
+              <option value="">All Business Units</option>
+              {BUSINESS_UNITS.map((u) => (
+                <option key={u.value} value={u.value}>{u.label}</option>
+              ))}
+            </select>
+          </div>
+          <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
+            onClick={openCreate}
+            className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-600 to-violet-600 text-white rounded-xl font-semibold shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 transition-shadow text-sm">
+            <MdAdd className="text-lg" /> Add Department
+          </motion.button>
+        </div>
       </motion.div>
 
       {/* Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {departments.map((d, i) => {
+        {filteredDepts.map((d, i) => {
           const grad = DEPT_GRADIENTS[i % DEPT_GRADIENTS.length];
           const count = deptCount(d.id);
           return (
@@ -135,24 +151,11 @@ export default function DepartmentsPage() {
                       </p>
                     </div>
                   </div>
-                  <div className="flex gap-1 flex-shrink-0">
-                    <motion.button whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        openEdit(d);
-                      }}
-                      className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
-                      <MdEdit className="text-sm" />
-                    </motion.button>
-                    <motion.button whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDelete(d.id);
-                      }}
-                      className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
-                      <MdDelete className="text-sm" />
-                    </motion.button>
-                  </div>
+                  <motion.button whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
+                    onClick={(e) => { e.stopPropagation(); openEdit(d); }}
+                    className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors flex-shrink-0">
+                    <MdEdit className="text-sm" />
+                  </motion.button>
                 </div>
 
                 <div className="mt-4 pt-4 border-t border-gray-50 flex items-center justify-between">
@@ -181,22 +184,28 @@ export default function DepartmentsPage() {
           );
         })}
 
-        {departments.length === 0 && (
+        {filteredDepts.length === 0 && (
           <motion.div variants={fadeUp} className="col-span-3 bg-white rounded-2xl border border-gray-100 shadow-sm text-center py-20">
             <div className="w-14 h-14 bg-gray-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
               <MdBusinessCenter className="text-gray-300 text-3xl" />
             </div>
-            <p className="text-gray-600 font-semibold">No departments yet</p>
-            <p className="text-gray-400 text-sm mt-1">Create your first department to get started</p>
-            <motion.button whileHover={{ scale: 1.03 }} onClick={openCreate}
-              className="mt-5 px-6 py-2.5 bg-gradient-to-r from-blue-600 to-violet-600 text-white rounded-xl font-semibold text-sm shadow-lg shadow-blue-500/25">
-              Add Department
-            </motion.button>
+            <p className="text-gray-600 font-semibold">
+              {buFilter ? "No departments in this business unit" : "No departments yet"}
+            </p>
+            <p className="text-gray-400 text-sm mt-1">
+              {buFilter ? "Try selecting a different filter" : "Create your first department to get started"}
+            </p>
+            {!buFilter && (
+              <motion.button whileHover={{ scale: 1.03 }} onClick={openCreate}
+                className="mt-5 px-6 py-2.5 bg-gradient-to-r from-blue-600 to-violet-600 text-white rounded-xl font-semibold text-sm shadow-lg shadow-blue-500/25">
+                Add Department
+              </motion.button>
+            )}
           </motion.div>
         )}
       </div>
 
-      {/* Modal */}
+      {/* Add/Edit Modal */}
       <AnimatePresence>
         {showForm && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -218,12 +227,12 @@ export default function DepartmentsPage() {
 
               <form onSubmit={handleSubmit} className="p-5 space-y-4">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">Department Name *</label>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">Department Name <span className="text-red-500">*</span></label>
                   <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}
                     required placeholder="e.g., Software" className="input-field" />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">Business Unit *</label>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">Business Unit <span className="text-red-500">*</span></label>
                   <select
                     value={form.business_unit}
                     onChange={(e) => setForm({ ...form, business_unit: e.target.value })}

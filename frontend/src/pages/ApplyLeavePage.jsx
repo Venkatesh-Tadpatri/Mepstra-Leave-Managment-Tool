@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
 import { motion, AnimatePresence } from "framer-motion";
 import toast from "react-hot-toast";
-import { applyLeave, getMyBalance, getHolidays, getMyEmergencyOverrideToday, submitWFH, getMySpecialCredits } from "../services/api";
+import { applyLeave, getMyBalance, getHolidays, getMyEmergencyOverrideToday, submitWFH, getMySpecialCredits, getLeaves } from "../services/api";
 import { format, differenceInCalendarDays } from "date-fns";
 import { MdCalendarMonth, MdInfo, MdArrowBack, MdSend, MdWarning } from "react-icons/md";
 
@@ -73,6 +73,7 @@ export default function ApplyLeavePage() {
   const [loading, setLoading] = useState(false);
   const [balance, setBalance] = useState(null);
   const [holidays, setHolidays] = useState([]);
+  const [usedOptionalDates, setUsedOptionalDates] = useState(new Set());
   const [specialCredits, setSpecialCredits] = useState([]);
   const [workingDays, setWorkingDays] = useState(0);
   const [advanceWarning, setAdvanceWarning] = useState("");
@@ -96,6 +97,17 @@ export default function ApplyLeavePage() {
     getHolidays(new Date().getFullYear()).then((r) => setHolidays(r.data)).catch(() => {});
     getMyEmergencyOverrideToday().then((r) => setManagerOverrideEnabled(!!r.data?.enabled)).catch(() => {});
     getMySpecialCredits().then((r) => setSpecialCredits(r.data)).catch(() => {});
+    // Fetch existing optional leaves to disable already-used holiday dates
+    getLeaves({ leave_type: "optional", year: new Date().getFullYear() })
+      .then((r) => {
+        const used = new Set(
+          (r.data || [])
+            .filter((l) => ["pending", "approved"].includes(l.status))
+            .map((l) => l.start_date)
+        );
+        setUsedOptionalDates(used);
+      })
+      .catch(() => {});
   }, []);
 
   const isWeekendRequest = form.request_type === "weekend_work";
@@ -104,6 +116,9 @@ export default function ApplyLeavePage() {
   const isCasual = form.leave_type === "casual";
   const isLOP = form.leave_type === "lop";
   const isCompensate = form.leave_type === "compensate";
+  const isOptionalLeave = form.leave_type === "optional";
+  const isCalendarLeave = form.leave_type === "maternity" || form.leave_type === "paternity";
+  const optionalHolidays = holidays.filter((h) => h.holiday_type === "optional");
   const selectedCategory = LEAVE_CATEGORIES.find((t) => t.value === form.leave_type);
   // Only credits earned >= 15 days ago count as eligible for compensate leave
   const eligibleSpecialDays = specialCredits.filter((c) => c.is_eligible).reduce((s, c) => s + c.days, 0);
@@ -113,6 +128,14 @@ export default function ApplyLeavePage() {
   useEffect(() => {
     if (!form.start_date || !form.end_date) {
       setWorkingDays(0);
+      setAdvanceWarning("");
+      setWeekendWarning("");
+      return;
+    }
+
+    // Optional leave is always exactly 1 day (specific holiday)
+    if (isOptionalLeave) {
+      setWorkingDays(form.half_day ? 0.5 : 1);
       setAdvanceWarning("");
       setWeekendWarning("");
       return;
@@ -142,15 +165,20 @@ export default function ApplyLeavePage() {
       return;
     }
 
-    const holidayDates = new Set(
-      holidays.filter((h) => h.holiday_type === "mandatory").map((h) => h.date)
-    );
-    let count = 0;
-    let cur = new Date(start);
-    while (cur <= end) {
-      const ds = format(cur, "yyyy-MM-dd");
-      if (cur.getDay() !== 0 && cur.getDay() !== 6 && !holidayDates.has(ds)) count++;
-      cur.setDate(cur.getDate() + 1);
+    let count;
+    if (isCalendarLeave) {
+      count = differenceInCalendarDays(end, start) + 1;
+    } else {
+      const holidayDates = new Set(
+        holidays.filter((h) => h.holiday_type === "mandatory").map((h) => h.date)
+      );
+      count = 0;
+      let cur = new Date(start);
+      while (cur <= end) {
+        const ds = format(cur, "yyyy-MM-dd");
+        if (cur.getDay() !== 0 && cur.getDay() !== 6 && !holidayDates.has(ds)) count++;
+        cur.setDate(cur.getDate() + 1);
+      }
     }
     const days = form.half_day ? 0.5 : count;
     setWorkingDays(days);
@@ -190,6 +218,7 @@ export default function ApplyLeavePage() {
     form.request_type,
     holidays,
     isWeekendRequest,
+    isOptionalLeave,
     isCasual,
     managerOverrideEnabled,
   ]);
@@ -208,6 +237,10 @@ export default function ApplyLeavePage() {
     if (form.leave_type !== "sick") {
       setForm((f) => ({ ...f, is_retroactive: false }));
     }
+
+    // Clear dates when switching leave type so stale dates don't carry over
+    setForm((f) => ({ ...f, start_date: "", end_date: "" }));
+    setWorkingDays(0);
   }, [form.leave_type, form.request_type, isWeekendRequest]);
 
   useEffect(() => {
@@ -367,7 +400,7 @@ export default function ApplyLeavePage() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1.5">Request Type *</label>
+              <label className="block text-sm font-semibold text-gray-700 mb-1.5">Request Type <span className="text-red-500">*</span></label>
               <select
                 value={form.request_type}
                 onChange={(e) => setForm((f) => ({ ...f, request_type: e.target.value }))}
@@ -381,7 +414,7 @@ export default function ApplyLeavePage() {
 
             {!isWeekendRequest && !isWFH && (
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1.5">Leave Category *</label>
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5">Leave Category <span className="text-red-500">*</span></label>
                 <select
                   value={form.leave_type}
                   onChange={(e) => setForm((f) => ({ ...f, leave_type: e.target.value }))}
@@ -492,7 +525,7 @@ export default function ApplyLeavePage() {
 
           {!isWeekendRequest && !isWFH && isCasual && !form.half_day && (
             <div className="mb-3">
-              <label className="block text-sm font-semibold text-gray-700 mb-1.5">Number of Leave Days *</label>
+              <label className="block text-sm font-semibold text-gray-700 mb-1.5">Number of Leave Days <span className="text-red-500">*</span></label>
               <select
                 value={form.requested_days}
                 onChange={(e) => setForm((f) => ({ ...f, requested_days: Number(e.target.value) }))}
@@ -537,10 +570,97 @@ export default function ApplyLeavePage() {
             </label>
           )}
 
+          {/* Optional leave: show holiday picker instead of free date inputs */}
+          {isOptionalLeave ? (
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                Select Optional Holiday <span className="text-red-500">*</span>
+              </label>
+              {/* Quota exhausted banner */}
+              {available <= 0 && (
+                <div className="mb-3 flex items-start gap-3 rounded-xl px-4 py-3.5 bg-red-50 border border-red-200">
+                  <MdWarning className="text-red-500 text-xl flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-bold text-red-700">Optional Leave Limit Reached</p>
+                    <p className="text-xs text-red-600 mt-0.5">
+                      You have already used {balance?.optional_total ?? 2} optional leaves for the year {new Date().getFullYear()}.
+                      No more optional leaves can be applied this year.
+                    </p>
+                  </div>
+                </div>
+              )}
+              {optionalHolidays.length === 0 ? (
+                <div className="rounded-xl px-4 py-4 bg-amber-50 border border-amber-200 text-amber-700 text-sm">
+                  No optional holidays declared for {new Date().getFullYear()}. Contact HR to add optional holidays.
+                </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                    {optionalHolidays.map((h) => {
+                      const d = new Date(h.date + "T00:00:00");
+                      const dayName = d.toLocaleDateString("en-IN", { weekday: "long" });
+                      const dateStr = d.toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
+                      const isSelected = form.start_date === h.date;
+                      const isUsed = usedOptionalDates.has(h.date);
+                      const quotaFull = available <= 0 && !isUsed;
+                      const isDisabled = isUsed || quotaFull;
+                      return (
+                        <button
+                          key={h.id}
+                          type="button"
+                          disabled={isDisabled}
+                          onClick={() => {
+                            if (isDisabled) return;
+                            setForm((f) => ({ ...f, start_date: h.date, end_date: h.date }));
+                            setWorkingDays(form.half_day ? 0.5 : 1);
+                          }}
+                          className={`flex items-center gap-3 p-3.5 rounded-xl border-2 text-left transition-all ${
+                            isUsed
+                              ? "border-gray-200 bg-gray-50 opacity-60 cursor-not-allowed"
+                              : quotaFull
+                                ? "border-red-100 bg-red-50/40 opacity-50 cursor-not-allowed"
+                                : isSelected
+                                  ? "border-amber-400 bg-amber-50"
+                                  : "border-gray-200 bg-white hover:border-amber-300 hover:bg-amber-50/40 cursor-pointer"
+                          }`}
+                        >
+                          <div className={`w-12 h-12 rounded-xl flex flex-col items-center justify-center flex-shrink-0 shadow-sm ${
+                            isUsed || quotaFull ? "bg-gray-200 text-gray-400" : isSelected ? "bg-amber-400 text-white" : "bg-amber-100 text-amber-700"
+                          }`}>
+                            <span className="text-base font-extrabold leading-none">{d.getDate()}</span>
+                            <span className="text-[10px] opacity-80">{d.toLocaleDateString("en-IN", { month: "short" })}</span>
+                          </div>
+                          <div className="min-w-0">
+                            <p className={`font-semibold text-sm truncate ${isDisabled ? "text-gray-400 line-through" : isSelected ? "text-amber-800" : "text-gray-800"}`}>{h.name}</p>
+                            <p className="text-xs text-gray-400">{dayName} · {dateStr}</p>
+                            {isUsed && (
+                              <span className="inline-block mt-1 text-[10px] font-bold px-1.5 py-0.5 rounded bg-gray-300 text-gray-600">Already Used</span>
+                            )}
+                            {quotaFull && (
+                              <span className="inline-block mt-1 text-[10px] font-bold px-1.5 py-0.5 rounded bg-red-200 text-red-600">Quota Full</span>
+                            )}
+                            {isSelected && !isDisabled && (
+                              <span className="inline-block mt-1 text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-400 text-white">Selected</span>
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {form.start_date && (
+                    <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                      ⭐ You have selected: <strong>{optionalHolidays.find((h) => h.date === form.start_date)?.name}</strong> on{" "}
+                      {new Date(form.start_date + "T00:00:00").toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
+                    </p>
+                  )}
+                </>
+              )}
+            </div>
+          ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                {!isWeekendRequest && !isWFH && form.half_day ? "Date" : "Start Date"} *
+                {!isWeekendRequest && !isWFH && form.half_day ? "Date" : "Start Date"} <span className="text-red-500">*</span>
               </label>
               <input
                 type="date"
@@ -560,7 +680,7 @@ export default function ApplyLeavePage() {
 
             {!((!isWeekendRequest && !isWFH) && form.half_day) && (
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1.5">End Date *</label>
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5">End Date <span className="text-red-500">*</span></label>
                 <input
                   type="date"
                   value={form.end_date}
@@ -572,6 +692,7 @@ export default function ApplyLeavePage() {
               </div>
             )}
           </div>
+          )}
 
           <AnimatePresence>
             {workingDays > 0 && (
@@ -585,7 +706,7 @@ export default function ApplyLeavePage() {
               >
                 <MdCalendarMonth className="text-lg" />
                 <span>
-                  <strong>{workingDays}</strong> {isWFH ? "working day(s) requested for WFH" : isWeekendRequest ? "weekend day(s) requested for credit" : "working day(s) requested"}
+                  <strong>{workingDays}</strong> {isWFH ? "working day(s) requested for WFH" : isWeekendRequest ? "weekend day(s) requested for credit" : isCalendarLeave ? "calendar day(s) requested (weekends & holidays included)" : "working day(s) requested"}
                 </span>
               </motion.div>
             )}

@@ -263,6 +263,35 @@ def run_migrations():
             ))
             conn.commit()
 
+        # ── allowed_emails: registered_user_id ───────────────────────────
+        if not _column_exists(conn, "allowed_emails", "registered_user_id"):
+            logger.info("Adding allowed_emails.registered_user_id")
+            conn.execute(text(
+                "ALTER TABLE allowed_emails ADD COLUMN registered_user_id INT NULL, "
+                "ADD INDEX ix_allowed_emails_registered_user_id (registered_user_id)"
+            ))
+            # Backfill: link existing whitelist entries to registered users by email
+            conn.execute(text(
+                "UPDATE allowed_emails ae "
+                "JOIN users u ON u.email IN (ae.outlook_email, ae.gmail) "
+                "SET ae.registered_user_id = u.id "
+                "WHERE ae.registered_user_id IS NULL"
+            ))
+            conn.commit()
+
+        # ── allowed_emails: leave quota columns ──────────────────────────
+        for col, default in [
+            ("casual_leaves",   "12.0"),
+            ("sick_leaves",     "6.0"),
+            ("optional_leaves", "2.0"),
+        ]:
+            if not _column_exists(conn, "allowed_emails", col):
+                logger.info("Adding allowed_emails.%s", col)
+                conn.execute(text(
+                    f"ALTER TABLE allowed_emails ADD COLUMN {col} FLOAT NOT NULL DEFAULT {default}"
+                ))
+                conn.commit()
+
         logger.info("Schema migrations complete.")
         print("Schema migrations applied successfully.")
 

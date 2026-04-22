@@ -26,11 +26,17 @@ function isWeekendWorkRequest(leave) {
   );
 }
 
+function fmtLeaveType(type) {
+  if (!type) return "";
+  if (type === "lop") return "LOP";
+  return type.charAt(0).toUpperCase() + type.slice(1);
+}
+
 function getLeaveDisplayType(leave) {
   if (!leave) return "";
   if (isWeekendWorkRequest(leave)) return "Weekend Work Request";
   if (leave.leave_type === "special") return "Compensate Leave";
-  return leave.leave_type;
+  return fmtLeaveType(leave.leave_type);
 }
 
 const WFH_COLOR = "#0284c7";

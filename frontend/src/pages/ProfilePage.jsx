@@ -221,7 +221,7 @@ export default function ProfilePage() {
     }
   }
 
-  const roleLabel = user?.role?.replace(/_/g, " ")?.replace(/\b\w/g, (c) => c.toUpperCase()) || "";
+  const roleLabel = user?.role === "hr" ? "HR/Admin" : (user?.role?.replace(/_/g, " ")?.replace(/\b\w/g, (c) => c.toUpperCase()) || "");
   const roleStyle = ROLE_GRADIENTS[user?.role] || ROLE_GRADIENTS.employee;
   const avatarSrc = user?.profile_image ? `${API_BASE}${user.profile_image}` : null;
 

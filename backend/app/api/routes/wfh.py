@@ -1,7 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
 from sqlalchemy.orm import Session
-from sqlalchemy import or_
-from typing import List
+from sqlalchemy import or_, extract, func
+from typing import List, Optional
 from datetime import date, datetime
 from app.db.database import get_db
 from app.api.deps import get_current_user
@@ -64,6 +64,7 @@ def _serialize(req: WorkFromHomeRequest) -> dict:
 @router.post("", status_code=201)
 def submit_wfh(
     data: WFHCreate,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -82,21 +83,19 @@ def submit_wfh(
     db.commit()
     db.refresh(req)
 
-    # Notify manager
+    # Notify manager in background (non-blocking)
     manager = db.query(User).filter(User.id == current_user.manager_id).first()
     if manager:
-        try:
-            send_wfh_request_email(
-                employee_name=current_user.full_name,
-                start_date=data.start_date,
-                end_date=data.end_date,
-                total_days=days,
-                reason=data.reason or "",
-                approver_email=manager.email,
-                approver_name=manager.full_name,
-            )
-        except Exception as e:
-            logger.warning("WFH request email failed: %s", e)
+        background_tasks.add_task(
+            send_wfh_request_email,
+            employee_name=current_user.full_name,
+            start_date=data.start_date,
+            end_date=data.end_date,
+            total_days=days,
+            reason=data.reason or "",
+            approver_email=manager.email,
+            approver_name=manager.full_name,
+        )
 
     return _serialize(req)
 
@@ -192,6 +191,7 @@ def wfh_today(
 def action_wfh(
     req_id: int,
     data: WFHUpdate,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -219,21 +219,19 @@ def action_wfh(
     db.commit()
     db.refresh(req)
 
-    # Notify employee
+    # Notify employee in background (non-blocking)
     employee = db.query(User).filter(User.id == req.user_id).first()
     if employee:
-        try:
-            send_wfh_status_email(
-                employee_email=employee.email,
-                employee_name=employee.full_name,
-                start_date=req.start_date,
-                end_date=req.end_date,
-                total_days=req.total_days,
-                status=data.action + "d",  # "approved" / "rejected"
-                comment=data.comment or "",
-            )
-        except Exception as e:
-            logger.warning("WFH status email failed: %s", e)
+        background_tasks.add_task(
+            send_wfh_status_email,
+            employee_email=employee.email,
+            employee_name=employee.full_name,
+            start_date=req.start_date,
+            end_date=req.end_date,
+            total_days=req.total_days,
+            status=data.action + "d",
+            comment=data.comment or "",
+        )
 
     return _serialize(req)
 
@@ -256,3 +254,68 @@ def cancel_wfh(
     req.status = WFHStatus.CANCELLED
     db.commit()
     return {"message": "WFH request cancelled"}
+
+
+@router.get("/report")
+def wfh_report(
+    year: Optional[int] = Query(None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Admin/HR/Manager: full WFH report with monthly breakdown and per-employee records."""
+    allowed = [UserRole.ADMIN, UserRole.MAIN_MANAGER, UserRole.HR, UserRole.MANAGER, UserRole.TEAM_LEAD]
+    if current_user.role not in allowed:
+        raise HTTPException(403, "Not authorized")
+
+    y = year or date.today().year
+
+    # All approved WFH for the year
+    q = db.query(WorkFromHomeRequest).filter(
+        WorkFromHomeRequest.status == WFHStatus.APPROVED,
+        extract("year", WorkFromHomeRequest.start_date) == y,
+    )
+    # Managers/team leads only see their own assigned employees
+    if current_user.role in [UserRole.MANAGER, UserRole.TEAM_LEAD]:
+        assigned_ids = [
+            u.id for u in db.query(User).filter(
+                User.manager_id == current_user.id if current_user.role == UserRole.MANAGER
+                else User.team_lead_id == current_user.id,
+                User.is_active == True,
+            ).all()
+        ]
+        q = q.filter(WorkFromHomeRequest.user_id.in_(assigned_ids))
+
+    reqs = q.order_by(WorkFromHomeRequest.start_date.asc()).all()
+
+    # Monthly breakdown
+    monthly = {}
+    for m in range(1, 13):
+        monthly[m] = 0
+    for r in reqs:
+        monthly[r.start_date.month] += 1
+
+    # Per-employee summary
+    emp_map: dict[int, dict] = {}
+    for r in reqs:
+        uid = r.user_id
+        if uid not in emp_map:
+            emp_map[uid] = {
+                "employee_name": r.user.full_name if r.user else "—",
+                "department": r.user.department.name if r.user and r.user.department else "—",
+                "count": 0,
+                "dates": [],
+            }
+        emp_map[uid]["count"] += 1
+        approved_by = r.manager.full_name if r.manager else "—"
+        emp_map[uid]["dates"].append({
+            "date": str(r.start_date),
+            "approved_by": approved_by,
+        })
+
+    return {
+        "year": y,
+        "total": len(reqs),
+        "monthly": [{"month": m, "count": monthly[m]} for m in range(1, 13)],
+        "employees": list(emp_map.values()),
+        "records": [_serialize(r) for r in reqs],
+    }

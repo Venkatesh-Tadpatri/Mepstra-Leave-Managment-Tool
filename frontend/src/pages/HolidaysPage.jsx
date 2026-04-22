@@ -3,7 +3,7 @@ import { useSelector } from "react-redux";
 import { motion, AnimatePresence } from "framer-motion";
 import toast from "react-hot-toast";
 import { getHolidays, createHoliday, updateHoliday, deleteHoliday } from "../services/api";
-import { MdAdd, MdEdit, MdDelete, MdHolidayVillage, MdClose } from "react-icons/md";
+import { MdAdd, MdEdit, MdDelete, MdHolidayVillage, MdClose, MdWarning } from "react-icons/md";
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 
@@ -17,6 +17,48 @@ const MONTH_BG = [
   "from-purple-500 to-violet-400","from-blue-600 to-indigo-500","from-green-600 to-teal-500",
 ];
 
+function ConfirmModal({ holiday, onConfirm, onCancel }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+      onClick={onCancel}
+    >
+      <motion.div
+        initial={{ opacity: 0, scale: 0.92, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.92 }}
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex flex-col items-center px-6 pt-7 pb-2 text-center">
+          <div className="w-14 h-14 rounded-full bg-red-100 flex items-center justify-center mb-4">
+            <MdWarning className="text-red-500 text-3xl" />
+          </div>
+          <h3 className="text-base font-extrabold text-gray-900 mb-1">Delete Holiday</h3>
+          <p className="text-sm text-gray-500">
+            Are you sure you want to delete <span className="font-semibold text-gray-800">{holiday?.name}</span>? This action cannot be undone.
+          </p>
+        </div>
+        <div className="flex gap-3 px-6 py-5">
+          <button
+            onClick={onCancel}
+            className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            className="flex-1 py-2.5 rounded-xl bg-red-500 text-white text-sm font-semibold hover:bg-red-600 transition-colors"
+          >
+            Delete
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
 export default function HolidaysPage() {
   const { user } = useSelector((s) => s.auth);
   const isAdmin = ["admin", "main_manager", "hr"].includes(user?.role);
@@ -26,6 +68,7 @@ export default function HolidaysPage() {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState({ name: "", date: "", holiday_type: "mandatory", description: "", year });
+  const [confirmHoliday, setConfirmHoliday] = useState(null);
 
   async function loadYears() {
     try {
@@ -58,9 +101,14 @@ export default function HolidaysPage() {
     } catch (err) { toast.error(err.response?.data?.detail || "Failed"); }
   }
 
-  async function handleDelete(id) {
-    if (!confirm("Delete this holiday?")) return;
-    try { await deleteHoliday(id); toast.success("Deleted"); loadYears(); load(); } catch {}
+  function handleDelete(holiday) {
+    setConfirmHoliday(holiday);
+  }
+
+  async function confirmDelete() {
+    const h = confirmHoliday;
+    setConfirmHoliday(null);
+    try { await deleteHoliday(h.id); toast.success("Deleted"); loadYears(); load(); } catch {}
   }
 
   const grouped = {};
@@ -139,7 +187,7 @@ export default function HolidaysPage() {
                 return (
                   <motion.div key={h.id}
                     initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.05 }}
-                    className={`flex items-center gap-4 p-3 rounded-xl transition-colors group ${i % 2 === 0 ? "bg-white hover:bg-blue-50/30" : "bg-slate-50/60 hover:bg-blue-50/40"}`}
+                    className={`flex items-center gap-4 p-3 rounded-xl transition-colors ${i % 2 === 0 ? "bg-white hover:bg-blue-50/40" : "bg-slate-100 hover:bg-slate-200/70"}`}
                   >
                     {/* Date badge */}
                     <div className={`w-12 h-12 rounded-xl flex flex-col items-center justify-center text-white flex-shrink-0 shadow-md bg-gradient-to-br ${MONTH_BG[month]}`}>
@@ -162,14 +210,14 @@ export default function HolidaysPage() {
                     </div>
 
                     {isAdmin && (
-                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="flex gap-1">
                         <motion.button whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
                           onClick={() => { setEditing(h); setForm({ name:h.name,date:h.date,holiday_type:h.holiday_type,description:h.description||"",year:h.year }); setShowForm(true); }}
                           className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
                           <MdEdit />
                         </motion.button>
                         <motion.button whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
-                          onClick={() => handleDelete(h.id)}
+                          onClick={() => handleDelete(h)}
                           className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
                           <MdDelete />
                         </motion.button>
@@ -215,12 +263,12 @@ export default function HolidaysPage() {
               </div>
               <form onSubmit={handleSubmit} className="p-6 space-y-4">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">Holiday Name *</label>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">Holiday Name <span className="text-red-500">*</span></label>
                   <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}
                     required placeholder="e.g., Diwali" className="input-field" />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">Date *</label>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">Date <span className="text-red-500">*</span></label>
                   <input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })}
                     required className="input-field" />
                 </div>
@@ -254,6 +302,17 @@ export default function HolidaysPage() {
               </form>
             </motion.div>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Delete confirmation modal */}
+      <AnimatePresence>
+        {confirmHoliday && (
+          <ConfirmModal
+            holiday={confirmHoliday}
+            onConfirm={confirmDelete}
+            onCancel={() => setConfirmHoliday(null)}
+          />
         )}
       </AnimatePresence>
     </motion.div>

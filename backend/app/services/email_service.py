@@ -99,7 +99,7 @@ def send_otp_email(to_email: str, otp: str):
                      background:#f0f4ff;border:2px dashed #1a56db;border-radius:12px;
                      padding:16px 32px;color:#1a56db">{otp}</span>
       </div>
-      <p style="color:#6b7280;font-size:13px">This OTP is valid for <strong>2 minutes 30 seconds</strong>. Do not share it with anyone.</p>
+      <p style="color:#6b7280;font-size:13px">This OTP is valid for <strong>2 minutes</strong>. Do not share it with anyone.</p>
       <p style="color:#6b7280;font-size:12px">This is an automated notification from {settings.COMPANY_NAME}.</p>
     </div></body></html>
     """

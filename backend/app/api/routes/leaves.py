@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, and_
 from typing import List, Optional
@@ -40,37 +40,40 @@ def _credit_special_leave(leave: LeaveRequest, balance: LeaveBalance, db: Sessio
 
 
 @router.post("", response_model=LeaveRequestResponse, status_code=201)
-def apply_leave(data: LeaveRequestCreate, db: Session = Depends(get_db),
+def apply_leave(data: LeaveRequestCreate, background_tasks: BackgroundTasks,
+                db: Session = Depends(get_db),
                 current_user: User = Depends(get_current_user)):
     try:
         leave = create_leave_request(current_user.id, data, db)
     except ValueError as e:
         raise HTTPException(400, str(e))
 
-    # Send email to manager/approver
+    # Send email to manager/approver in background
     if leave.manager_id:
         approver = db.query(User).filter(User.id == leave.manager_id).first()
         if approver:
-            send_leave_request_email(
+            background_tasks.add_task(
+                send_leave_request_email,
                 current_user.full_name, leave.leave_type.value,
                 leave.start_date, leave.end_date, leave.total_days,
                 leave.reason, approver.email, approver.full_name, leave.id
             )
 
-    # Always notify HR
+    # Always notify HR in background
     if current_user.hr_id:
         hr = db.query(User).filter(User.id == current_user.hr_id).first()
         if hr:
-            send_leave_request_email(
+            background_tasks.add_task(
+                send_leave_request_email,
                 current_user.full_name, leave.leave_type.value,
                 leave.start_date, leave.end_date, leave.total_days,
                 leave.reason, hr.email, hr.full_name, leave.id
             )
     else:
-        # Notify any HR user if employee's HR is not set
         hr_users = db.query(User).filter(User.role == UserRole.HR, User.is_active == True).all()
         for hr in hr_users:
-            send_leave_request_email(
+            background_tasks.add_task(
+                send_leave_request_email,
                 current_user.full_name, leave.leave_type.value,
                 leave.start_date, leave.end_date, leave.total_days,
                 leave.reason, hr.email, hr.full_name, leave.id
@@ -202,7 +205,8 @@ def get_leave(leave_id: int, db: Session = Depends(get_db),
 
 
 @router.put("/{leave_id}/action", response_model=LeaveRequestResponse)
-def action_leave(leave_id: int, data: LeaveRequestUpdate, db: Session = Depends(get_db),
+def action_leave(leave_id: int, data: LeaveRequestUpdate, background_tasks: BackgroundTasks,
+                 db: Session = Depends(get_db),
                  current_user: User = Depends(get_current_user)):
     # HR role is view-only — cannot approve/reject
     if current_user.role == UserRole.HR:
@@ -224,12 +228,12 @@ def action_leave(leave_id: int, data: LeaveRequestUpdate, db: Session = Depends(
             leave.status = LeaveStatus.APPROVED
             balance = get_or_create_balance(leave.user_id, leave.start_date.year, db)
             if _is_weekend_work_request(leave):
-                # Weekend work: credit special balance and record earned credit
                 _credit_special_leave(leave, balance, db)
             else:
                 deduct_leave(balance, leave.leave_type, leave.total_days)
             db.commit()
-            send_leave_status_email(
+            background_tasks.add_task(
+                send_leave_status_email,
                 employee.email, employee.full_name,
                 leave.leave_type.value, leave.start_date, leave.end_date,
                 leave.total_days, "approved", data.comment or "", leave.reason
@@ -237,14 +241,16 @@ def action_leave(leave_id: int, data: LeaveRequestUpdate, db: Session = Depends(
             if employee.hr_id:
                 hr = db.query(User).filter(User.id == employee.hr_id).first()
                 if hr:
-                    send_leave_status_email(
+                    background_tasks.add_task(
+                        send_leave_status_email,
                         hr.email, hr.full_name,
                         leave.leave_type.value, leave.start_date, leave.end_date,
                         leave.total_days, "approved", data.comment or "", leave.reason
                     )
         else:
             leave.status = LeaveStatus.REJECTED
-            send_leave_status_email(
+            background_tasks.add_task(
+                send_leave_status_email,
                 employee.email, employee.full_name,
                 leave.leave_type.value, leave.start_date, leave.end_date,
                 leave.total_days, "rejected", data.comment or "", leave.reason
@@ -252,7 +258,8 @@ def action_leave(leave_id: int, data: LeaveRequestUpdate, db: Session = Depends(
             if employee.hr_id:
                 hr = db.query(User).filter(User.id == employee.hr_id).first()
                 if hr:
-                    send_leave_status_email(
+                    background_tasks.add_task(
+                        send_leave_status_email,
                         hr.email, hr.full_name,
                         leave.leave_type.value, leave.start_date, leave.end_date,
                         leave.total_days, "rejected", data.comment or "", leave.reason
@@ -272,16 +279,17 @@ def action_leave(leave_id: int, data: LeaveRequestUpdate, db: Session = Depends(
             else:
                 deduct_leave(balance, leave.leave_type, leave.total_days)
             db.commit()
-            send_leave_status_email(
+            background_tasks.add_task(
+                send_leave_status_email,
                 employee.email, employee.full_name,
                 leave.leave_type.value, leave.start_date, leave.end_date,
                 leave.total_days, "approved", data.comment or "", leave.reason
             )
-            # Notify HR about approval
             if employee.hr_id:
                 hr = db.query(User).filter(User.id == employee.hr_id).first()
                 if hr:
-                    send_leave_status_email(
+                    background_tasks.add_task(
+                        send_leave_status_email,
                         hr.email, hr.full_name,
                         leave.leave_type.value, leave.start_date, leave.end_date,
                         leave.total_days, "approved", data.comment or "", leave.reason
@@ -289,16 +297,17 @@ def action_leave(leave_id: int, data: LeaveRequestUpdate, db: Session = Depends(
             else:
                 hr_users = db.query(User).filter(User.role == UserRole.HR, User.is_active == True).all()
                 for hr in hr_users:
-                    send_leave_status_email(
+                    background_tasks.add_task(
+                        send_leave_status_email,
                         hr.email, hr.full_name,
                         leave.leave_type.value, leave.start_date, leave.end_date,
                         leave.total_days, "approved", data.comment or "", leave.reason
                     )
-            # Notify the assigned manager if admin stepped in on their behalf
             if leave.manager_id and leave.manager_id != current_user.id:
                 assigned_mgr = db.query(User).filter(User.id == leave.manager_id).first()
                 if assigned_mgr and assigned_mgr.role not in [UserRole.ADMIN, UserRole.MAIN_MANAGER]:
-                    send_admin_approved_manager_notification(
+                    background_tasks.add_task(
+                        send_admin_approved_manager_notification,
                         assigned_mgr.email, assigned_mgr.full_name,
                         employee.full_name, leave.leave_type.value,
                         leave.start_date, leave.end_date, leave.total_days,
@@ -306,16 +315,17 @@ def action_leave(leave_id: int, data: LeaveRequestUpdate, db: Session = Depends(
                     )
         else:
             leave.status = LeaveStatus.REJECTED
-            send_leave_status_email(
+            background_tasks.add_task(
+                send_leave_status_email,
                 employee.email, employee.full_name,
                 leave.leave_type.value, leave.start_date, leave.end_date,
                 leave.total_days, "rejected", data.comment or "", leave.reason
             )
-            # Notify HR about rejection
             if employee.hr_id:
                 hr = db.query(User).filter(User.id == employee.hr_id).first()
                 if hr:
-                    send_leave_status_email(
+                    background_tasks.add_task(
+                        send_leave_status_email,
                         hr.email, hr.full_name,
                         leave.leave_type.value, leave.start_date, leave.end_date,
                         leave.total_days, "rejected", data.comment or "", leave.reason
@@ -340,8 +350,9 @@ def cancel_leave(leave_id: int, db: Session = Depends(get_db),
         raise HTTPException(404, "Leave not found")
     if leave.user_id != current_user.id:
         raise HTTPException(403, "Not authorized")
-    if leave.status not in [LeaveStatus.PENDING, LeaveStatus.APPROVED_BY_MANAGER]:
-        raise HTTPException(400, "Cannot cancel this leave")
-    leave.status = LeaveStatus.CANCELLED
+    if leave.status != LeaveStatus.PENDING:
+        raise HTTPException(400, "Only pending leave requests can be withdrawn")
+    # Pending leaves were never approved so no balance was deducted — just delete
+    db.delete(leave)
     db.commit()
-    return {"message": "Leave cancelled"}
+    return {"message": "Leave request withdrawn"}

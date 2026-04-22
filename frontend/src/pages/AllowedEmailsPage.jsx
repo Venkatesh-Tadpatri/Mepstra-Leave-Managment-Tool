@@ -4,15 +4,57 @@ import toast from "react-hot-toast";
 import { getAllowedEmails, addAllowedEmail, updateAllowedEmail, removeAllowedEmail } from "../services/api";
 import {
   MdEmail, MdAdd, MdDelete, MdClose, MdSearch, MdShield,
-  MdPerson, MdEdit, MdCheck,
+  MdPerson, MdEdit, MdCheck, MdWarning,
 } from "react-icons/md";
 import { SiGmail } from "react-icons/si";
 
 const fadeUp = { hidden: { opacity: 0, y: 16 }, show: { opacity: 1, y: 0, transition: { duration: 0.3 } } };
 const stagger = { show: { transition: { staggerChildren: 0.06 } } };
 
-const EMPTY_FORM = { employee_name: "", outlook_email: "", gmail: "", notes: "" };
+const EMPTY_FORM = { employee_name: "", outlook_email: "", gmail: "", casual_leaves: 12, sick_leaves: 6, optional_leaves: 2 };
 const EMPTY_ERRORS = { outlook_email: "", gmail: "" };
+
+function ConfirmModal({ name, onConfirm, onCancel }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+      onClick={onCancel}
+    >
+      <motion.div
+        initial={{ opacity: 0, scale: 0.92, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.92 }}
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex flex-col items-center px-6 pt-7 pb-2 text-center">
+          <div className="w-14 h-14 rounded-full bg-red-100 flex items-center justify-center mb-4">
+            <MdWarning className="text-red-500 text-3xl" />
+          </div>
+          <h3 className="text-base font-extrabold text-gray-900 mb-1">Remove Employee</h3>
+          <p className="text-sm text-gray-500">
+            Are you sure you want to remove <span className="font-semibold text-gray-800">{name}</span> from the whitelist? They will no longer be able to register.
+          </p>
+        </div>
+        <div className="flex gap-3 px-6 py-5">
+          <button
+            onClick={onCancel}
+            className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            className="flex-1 py-2.5 rounded-xl bg-red-500 text-white text-sm font-semibold hover:bg-red-600 transition-colors"
+          >
+            Remove
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
 
 export default function AllowedEmailsPage() {
   const [emails, setEmails] = useState([]);
@@ -24,6 +66,7 @@ export default function AllowedEmailsPage() {
   const [loading, setLoading] = useState(false);
   const [savingId, setSavingId] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
+  const [confirmEntry, setConfirmEntry] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
 
   async function load() {
@@ -64,7 +107,9 @@ export default function AllowedEmailsPage() {
         employee_name: form.employee_name.trim(),
         outlook_email: outlook || undefined,
         gmail: gmail || undefined,
-        notes: form.notes.trim() || undefined,
+        casual_leaves: Number(form.casual_leaves),
+        sick_leaves: Number(form.sick_leaves),
+        optional_leaves: Number(form.optional_leaves),
       });
       toast.success("Employee added to whitelist");
       setForm(EMPTY_FORM);
@@ -84,7 +129,9 @@ export default function AllowedEmailsPage() {
       await updateAllowedEmail(entry.id, {
         outlook_email: editForm.outlook_email?.trim().toLowerCase() || null,
         gmail: editForm.gmail?.trim().toLowerCase() || null,
-        notes: editForm.notes?.trim() || null,
+        casual_leaves: Number(editForm.casual_leaves),
+        sick_leaves: Number(editForm.sick_leaves),
+        optional_leaves: Number(editForm.optional_leaves),
       });
       toast.success("Updated");
       setEditingId(null);
@@ -97,7 +144,12 @@ export default function AllowedEmailsPage() {
   }
 
   async function handleRemove(entry) {
-    if (!confirm(`Remove ${entry.employee_name} from the whitelist?`)) return;
+    setConfirmEntry(entry);
+  }
+
+  async function confirmRemove() {
+    const entry = confirmEntry;
+    setConfirmEntry(null);
     setDeletingId(entry.id);
     try {
       await removeAllowedEmail(entry.id);
@@ -115,7 +167,9 @@ export default function AllowedEmailsPage() {
     setEditForm({
       outlook_email: entry.outlook_email || "",
       gmail: entry.gmail || "",
-      notes: entry.notes || "",
+      casual_leaves: entry.casual_leaves ?? 12,
+      sick_leaves: entry.sick_leaves ?? 6,
+      optional_leaves: entry.optional_leaves ?? 2,
     });
   }
 
@@ -124,8 +178,7 @@ export default function AllowedEmailsPage() {
       !search ||
       (e.employee_name || "").toLowerCase().includes(search.toLowerCase()) ||
       (e.outlook_email || "").toLowerCase().includes(search.toLowerCase()) ||
-      (e.gmail || "").toLowerCase().includes(search.toLowerCase()) ||
-      (e.notes || "").toLowerCase().includes(search.toLowerCase())
+      (e.gmail || "").toLowerCase().includes(search.toLowerCase())
   );
 
   return (
@@ -166,7 +219,7 @@ export default function AllowedEmailsPage() {
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search by name, email or notes..."
+          placeholder="Search by name or email…"
           className="flex-1 text-sm bg-transparent outline-none text-gray-700 placeholder-gray-300"
         />
         {search && (
@@ -190,7 +243,7 @@ export default function AllowedEmailsPage() {
                 <th className="px-4 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">
                   <span className="flex items-center gap-1.5"><SiGmail className="text-red-500" /> Office Email</span>
                 </th>
-                <th className="px-4 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Notes</th>
+                <th className="px-4 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Leave Quota</th>
                 <th className="px-4 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Added On</th>
                 <th className="px-4 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Actions</th>
               </tr>
@@ -261,18 +314,33 @@ export default function AllowedEmailsPage() {
                     )}
                   </td>
 
-                  {/* Notes */}
+                  {/* Leave Quota */}
                   <td className="px-4 py-3">
                     {editingId === entry.id ? (
-                      <input
-                        type="text"
-                        value={editForm.notes}
-                        onChange={(e) => setEditForm((f) => ({ ...f, notes: e.target.value }))}
-                        placeholder="Notes"
-                        className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400"
-                      />
+                      <div className="flex flex-col gap-1 min-w-[120px]">
+                        {[
+                          { key: "casual_leaves", label: "CL" },
+                          { key: "sick_leaves", label: "SL" },
+                          { key: "optional_leaves", label: "OL" },
+                        ].map(({ key, label }) => (
+                          <div key={key} className="flex items-center gap-1">
+                            <span className="text-[10px] text-gray-400 w-5">{label}</span>
+                            <input
+                              type="number"
+                              min={0}
+                              value={editForm[key]}
+                              onChange={(e) => setEditForm((f) => ({ ...f, [key]: e.target.value }))}
+                              className="w-12 px-1.5 py-1 text-xs border border-gray-200 rounded-lg focus:outline-none focus:border-sky-400 text-center"
+                            />
+                          </div>
+                        ))}
+                      </div>
                     ) : (
-                      <span className="text-gray-500 text-xs">{entry.notes || <span className="text-gray-300">—</span>}</span>
+                      <div className="flex flex-col gap-0.5 text-xs text-gray-600">
+                        <span><span className="text-gray-400">CL</span> {entry.casual_leaves ?? 12}</span>
+                        <span><span className="text-gray-400">SL</span> {entry.sick_leaves ?? 6}</span>
+                        <span><span className="text-gray-400">OL</span> {entry.optional_leaves ?? 2}</span>
+                      </div>
                     )}
                   </td>
 
@@ -387,7 +455,10 @@ export default function AllowedEmailsPage() {
                     <input
                       type="text"
                       value={form.employee_name}
-                      onChange={(e) => setForm((f) => ({ ...f, employee_name: e.target.value }))}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/\b\w/g, (c) => c.toUpperCase());
+                        setForm((f) => ({ ...f, employee_name: val }));
+                      }}
                       placeholder="e.g. Venkatesh Tadpatri"
                       required
                       className="input-field text-sm pl-9"
@@ -437,16 +508,31 @@ export default function AllowedEmailsPage() {
 
                 </div>
 
-                {/* Notes */}
+                {/* Leave Quota */}
                 <div>
-                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Notes (optional)</label>
-                  <input
-                    type="text"
-                    value={form.notes}
-                    onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
-                    placeholder="e.g. New hire — Engineering"
-                    className="input-field text-sm"
-                  />
+                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                    Leave Quota (Days)
+                  </label>
+                  <div className="grid grid-cols-3 gap-3">
+                    {[
+                      { key: "casual_leaves",   label: "Casual",   color: "sky" },
+                      { key: "sick_leaves",     label: "Sick",     color: "rose" },
+                      { key: "optional_leaves", label: "Optional", color: "violet" },
+                    ].map(({ key, label, color }) => (
+                      <div key={key} className={`flex flex-col items-center bg-${color}-50 border border-${color}-100 rounded-xl p-2.5`}>
+                        <label className={`text-[10px] font-semibold text-${color}-500 uppercase tracking-wide mb-1.5`}>{label}</label>
+                        <input
+                          type="number"
+                          min={0}
+                          max={365}
+                          value={form[key]}
+                          onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
+                          className={`w-full text-center text-base font-extrabold text-${color}-700 bg-transparent border-b-2 border-${color}-200 focus:outline-none focus:border-${color}-500`}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-[10px] text-gray-400 mt-1.5">Adjust if joining mid-year — these become the employee's annual leave totals.</p>
                 </div>
 
                 <div className="mt-auto">
@@ -463,6 +549,17 @@ export default function AllowedEmailsPage() {
               </form>
             </motion.div>
           </>
+        )}
+      </AnimatePresence>
+
+      {/* Delete confirmation modal */}
+      <AnimatePresence>
+        {confirmEntry && (
+          <ConfirmModal
+            name={confirmEntry.employee_name}
+            onConfirm={confirmRemove}
+            onCancel={() => setConfirmEntry(null)}
+          />
         )}
       </AnimatePresence>
     </motion.div>

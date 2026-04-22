@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import toast from "react-hot-toast";
 import { bulkCreateHolidays, getHolidays, updateHoliday, deleteHoliday } from "../services/api";
-import { MdAdd, MdDelete, MdCalendarMonth, MdCheckCircle, MdEdit, MdSave, MdClose, MdAutoAwesome } from "react-icons/md";
+import { MdAdd, MdDelete, MdCalendarMonth, MdCheckCircle, MdEdit, MdSave, MdClose, MdAutoAwesome, MdWarning } from "react-icons/md";
 
 const DAYS = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
@@ -41,6 +41,7 @@ export default function UpdateHolidaysPage() {
   const [existingHolidays, setExistingHolidays] = useState([]);
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({});
+  const [confirmHoliday, setConfirmHoliday] = useState(null);
 
   function updateRow(index, field, value) {
     setRows((prev) => {
@@ -129,10 +130,11 @@ export default function UpdateHolidaysPage() {
     }
   }
 
-  async function handleDelete(id) {
-    if (!confirm("Delete this holiday?")) return;
+  async function confirmDelete() {
+    const h = confirmHoliday;
+    setConfirmHoliday(null);
     try {
-      await deleteHoliday(id);
+      await deleteHoliday(h.id);
       toast.success("Deleted");
       loadYears();
       loadExisting(selectedYear);
@@ -392,7 +394,7 @@ export default function UpdateHolidaysPage() {
                                     style={{ background: "linear-gradient(135deg,#e0e7ff,#ede9fe)" }}>
                                     <MdEdit className="text-sm" /> Edit
                                   </button>
-                                  <button onClick={() => handleDelete(h.id)} title="Delete"
+                                  <button onClick={() => setConfirmHoliday(h)} title="Delete"
                                     className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors text-red-600"
                                     style={{ background: "linear-gradient(135deg,#fee2e2,#fecaca)" }}>
                                     <MdDelete className="text-sm" />
@@ -411,6 +413,45 @@ export default function UpdateHolidaysPage() {
           </div>
         )}
       </div>
+
+      {/* Delete confirm modal */}
+      <AnimatePresence>
+        {confirmHoliday && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+            onClick={() => setConfirmHoliday(null)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.92, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92 }}
+              className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex flex-col items-center px-6 pt-7 pb-2 text-center">
+                <div className="w-14 h-14 rounded-full bg-red-100 flex items-center justify-center mb-4">
+                  <MdWarning className="text-red-500 text-3xl" />
+                </div>
+                <h3 className="text-base font-extrabold text-gray-900 mb-1">Delete Holiday</h3>
+                <p className="text-sm text-gray-500">
+                  Are you sure you want to delete <span className="font-semibold text-gray-800">{confirmHoliday?.name}</span>? This action cannot be undone.
+                </p>
+              </div>
+              <div className="flex gap-3 px-6 py-5">
+                <button onClick={() => setConfirmHoliday(null)}
+                  className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors">
+                  Cancel
+                </button>
+                <button onClick={confirmDelete}
+                  className="flex-1 py-2.5 rounded-xl bg-red-500 text-white text-sm font-semibold hover:bg-red-600 transition-colors">
+                  Delete
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }

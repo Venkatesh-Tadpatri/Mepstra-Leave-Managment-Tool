@@ -1,20 +1,93 @@
 import { useEffect, useState } from "react";
-import { useSelector } from "react-redux";
+import { useSelector, useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   PieChart, Pie, Cell, Legend, Tooltip, ResponsiveContainer
 } from "recharts";
 import toast from "react-hot-toast";
-import { getDashboardStats, getEmployeeLeaveReport, getMyStats, getOnLeaveToday, getLeaveSchedule, getDepartments, getWFHToday } from "../services/api";
+import { getDashboardStats, getEmployeeLeaveReport, getMyStats, getOnLeaveToday, getLeaveSchedule, getDepartments, getWFHToday, getLeaves, cancelLeave } from "../services/api";
+import { fetchBalance } from "../store/slices/leaveSlice";
 import {
   MdPeople, MdPendingActions, MdPersonOff,
   MdEventNote, MdCalendarMonth, MdArrowForward,
-  MdFileDownload, MdPictureAsPdf, MdClose, MdBeachAccess, MdLaptop
+  MdFileDownload, MdPictureAsPdf, MdClose, MdBeachAccess, MdLaptop,
+  MdFilterList, MdCancel, MdWarning, MdAdd
 } from "react-icons/md";
 
 const fadeUp = { hidden: { opacity: 0, y: 24 }, show: { opacity: 1, y: 0 } };
 const stagger = { show: { transition: { staggerChildren: 0.08 } } };
+
+function fmtLeaveType(type) {
+  if (!type) return "";
+  if (type === "lop") return "LOP";
+  return type.charAt(0).toUpperCase() + type.slice(1);
+}
+
+function getLeaveTypeLabel(leave) {
+  if (leave.leave_type !== "special") return fmtLeaveType(leave.leave_type);
+  return (leave.reason || "").toLowerCase().startsWith("weekend work request:")
+    ? "Weekend Work" : "Compensate";
+}
+
+const LEAVE_COLORS = {
+  casual:    { bg: "bg-blue-100",    text: "text-blue-700"    },
+  sick:      { bg: "bg-emerald-100", text: "text-emerald-700" },
+  optional:  { bg: "bg-amber-100",  text: "text-amber-700"   },
+  maternity: { bg: "bg-pink-100",   text: "text-pink-700"    },
+  paternity: { bg: "bg-purple-100", text: "text-purple-700"  },
+  special:   { bg: "bg-orange-100", text: "text-orange-700"  },
+  lop:       { bg: "bg-gray-100",   text: "text-gray-700"    },
+};
+
+const STATUS_STYLES = {
+  pending:             { bg: "bg-yellow-50 border-yellow-200", text: "text-yellow-700",  dot: "#f59e0b" },
+  approved:            { bg: "bg-green-50 border-green-200",   text: "text-green-700",   dot: "#10b981" },
+  rejected:            { bg: "bg-red-50 border-red-200",       text: "text-red-700",     dot: "#ef4444" },
+  cancelled:           { bg: "bg-gray-50 border-gray-200",     text: "text-gray-600",    dot: "#9ca3af" },
+  approved_by_manager: { bg: "bg-blue-50 border-blue-200",     text: "text-blue-700",    dot: "#3b82f6" },
+};
+
+function CancelConfirmModal({ leave, onConfirm, onCancel }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+      onClick={onCancel}
+    >
+      <motion.div
+        initial={{ opacity: 0, scale: 0.92, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.92 }}
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex flex-col items-center px-6 pt-7 pb-2 text-center">
+          <div className="w-14 h-14 rounded-full bg-orange-100 flex items-center justify-center mb-4">
+            <MdWarning className="text-orange-500 text-3xl" />
+          </div>
+          <h3 className="text-base font-extrabold text-gray-900 mb-1">Withdraw Leave Request</h3>
+          <p className="text-sm text-gray-500">
+            Are you sure you want to withdraw your{" "}
+            <span className="font-semibold text-gray-800">{fmtLeaveType(leave?.leave_type)} Leave</span>{" "}
+            from <span className="font-semibold text-gray-800">{leave?.start_date}</span> to{" "}
+            <span className="font-semibold text-gray-800">{leave?.end_date}</span>?
+          </p>
+        </div>
+        <div className="flex gap-3 px-6 py-5">
+          <button onClick={onCancel}
+            className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors">
+            Keep Leave
+          </button>
+          <button onClick={onConfirm}
+            className="flex-1 py-2.5 rounded-xl bg-orange-500 text-white text-sm font-semibold hover:bg-orange-600 transition-colors">
+            Yes, Withdraw
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
 
 // Simple info columns: [key, label]
 const INFO_COLUMNS = [
@@ -105,24 +178,31 @@ function BalanceCard({ label, used, total, color, icon }) {
 
 export default function DashboardPage() {
   const { user } = useSelector((s) => s.auth);
+  const dispatch = useDispatch();
   const navigate = useNavigate();
   const [stats, setStats] = useState(null);
   const [myStats, setMyStats] = useState(null);
   const [exporting, setExporting] = useState(false);
   const [filter] = useState({ year: new Date().getFullYear() });
-  const [onLeaveList, setOnLeaveList] = useState(null); // null = modal closed
+  const [onLeaveList, setOnLeaveList] = useState(null);
   const [todayOnLeave, setTodayOnLeave] = useState([]);
   const [todayWFH, setTodayWFH] = useState([]);
   const [schedule, setSchedule] = useState([]);
   const [scheduleMonth, setScheduleMonth] = useState(new Date().getMonth() + 1);
   const [scheduleYear, setScheduleYear] = useState(new Date().getFullYear());
-  const [scheduleDay, setScheduleDay] = useState("");      // "" = all days, "YYYY-MM-DD" = specific date
-  const [scheduleDept, setScheduleDept] = useState(0);     // 0 = all departments
+  const [scheduleDay, setScheduleDay] = useState("");
+  const [scheduleDept, setScheduleDept] = useState(0);
   const [departments, setDepartments] = useState([]);
+  // My Leaves table state
+  const [myLeaves, setMyLeaves] = useState([]);
+  const [leaveFilter, setLeaveFilter] = useState({ status: "", leave_type: "", year: new Date().getFullYear() });
+  const [cancelTarget, setCancelTarget] = useState(null);
+  const [cancelling, setCancelling] = useState(false);
   const isAdmin = ["admin", "main_manager", "hr", "manager"].includes(user?.role);
   const isStrictAdmin = user?.role === "admin";
   const isHR = user?.role === "hr";
   const isManager = user?.role === "manager";
+  const showLeaveTable = ["employee", "team_lead"].includes(user?.role);
   const showScheduleSection = isStrictAdmin || isManager || isHR;
   const showDeptFilter = isStrictAdmin || isHR;
   const canExportReport = ["admin", "hr"].includes(user?.role);
@@ -154,6 +234,30 @@ export default function DashboardPage() {
     getLeaveSchedule(m, y, d, scheduleDept)
       .then((r) => setSchedule(r.data)).catch(() => {});
   }, [scheduleMonth, scheduleYear, scheduleDay, scheduleDept, showScheduleSection]);
+
+  useEffect(() => {
+    if (!showLeaveTable) return;
+    getLeaves(leaveFilter)
+      .then((r) => setMyLeaves(r.data || []))
+      .catch(() => setMyLeaves([]));
+  }, [leaveFilter, showLeaveTable]);
+
+  async function handleConfirmCancel() {
+    const leave = cancelTarget;
+    setCancelTarget(null);
+    setCancelling(true);
+    try {
+      await cancelLeave(leave.id);
+      toast.success("Leave request withdrawn successfully");
+      getLeaves(leaveFilter).then((r) => setMyLeaves(r.data || [])).catch(() => {});
+      getMyStats().then((r) => setMyStats(r.data)).catch(() => {});
+      dispatch(fetchBalance(leaveFilter.year));
+    } catch (err) {
+      toast.error(err.response?.data?.detail || "Failed to withdraw leave");
+    } finally {
+      setCancelling(false);
+    }
+  }
 
   function handleOnLeaveTodayClick() {
     getOnLeaveToday()
@@ -512,7 +616,7 @@ export default function DashboardPage() {
                       </td>
                       <td className="px-4 py-3 text-gray-500">{e.department}</td>
                       <td className="px-4 py-3">
-                        <span className="capitalize px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">{e.leave_type}</span>
+                        <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">{fmtLeaveType(e.leave_type)}</span>
                       </td>
                       <td className="px-4 py-3 text-gray-600">{e.start_date}</td>
                       <td className="px-4 py-3 text-gray-600">{e.end_date}</td>
@@ -679,7 +783,7 @@ export default function DashboardPage() {
                       </td>
                       <td className="px-4 py-3 text-gray-500">{e.department}</td>
                       <td className="px-4 py-3">
-                        <span className="capitalize px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">{e.leave_type}</span>
+                        <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">{fmtLeaveType(e.leave_type)}</span>
                       </td>
                       <td className="px-4 py-3 text-gray-600">{e.start_date}</td>
                       <td className="px-4 py-3 text-gray-600">{e.end_date}</td>
@@ -725,99 +829,234 @@ export default function DashboardPage() {
         </motion.div>
       )}
 
-      {/* My leave section — hidden for admin */}
-      {myStats && !isStrictAdmin && !isHR && !isManager && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-
-          {/* Balance card */}
-          <motion.div variants={fadeUp} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 lg:col-span-1">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-bold text-gray-900">Leave Balance</h3>
-              <span className="text-xs bg-blue-50 text-blue-600 font-semibold px-2.5 py-1 rounded-full">{new Date().getFullYear()}</span>
-            </div>
-            <motion.div variants={stagger} className="space-y-3">
-              {balances.map((b) => <BalanceCard key={b.label} {...b} />)}
+      {/* My Leaves section */}
+      {showLeaveTable && myStats && (
+        <>
+          {/* Balance + Pie row */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            {/* Balance card */}
+            <motion.div variants={fadeUp} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-bold text-gray-900">Leave Balance</h3>
+                <span className="text-xs bg-blue-50 text-blue-600 font-semibold px-2.5 py-1 rounded-full">{new Date().getFullYear()}</span>
+              </div>
+              <motion.div variants={stagger} className="space-y-3">
+                {balances.map((b) => <BalanceCard key={b.label} {...b} />)}
+              </motion.div>
+              <motion.button
+                whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+                onClick={() => navigate("/leaves/apply")}
+                className="mt-5 w-full py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-violet-600 text-white font-semibold text-sm shadow-md shadow-blue-500/20 hover:shadow-blue-500/40 transition-all flex items-center justify-center gap-2"
+              >
+                <MdAdd className="text-base" /> Apply for Leave
+              </motion.button>
             </motion.div>
-            <motion.button
-              whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
-              onClick={() => navigate("/leaves/apply")}
-              className="mt-5 w-full py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-violet-600 text-white font-semibold text-sm shadow-md shadow-blue-500/20 hover:shadow-blue-500/40 transition-all flex items-center justify-center gap-2"
-            >
-              <MdEventNote /> Apply for Leave
-            </motion.button>
-          </motion.div>
 
-          {/* Pie chart */}
-          <motion.div variants={fadeUp} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-            <h3 className="font-bold text-gray-900 mb-1">Leave Status</h3>
-            <p className="text-xs text-gray-400 mb-3">This year's overview</p>
-            {myStats.total_leaves === 0 ? (
-              <div className="flex flex-col items-center justify-center h-48 text-gray-300">
-                <MdCalendarMonth className="text-5xl mb-2" />
-                <p className="text-sm">No leaves this year</p>
+            {/* Pie chart */}
+            <motion.div variants={fadeUp} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+              <h3 className="font-bold text-gray-900 mb-1">Leave Status Overview</h3>
+              <p className="text-xs text-gray-400 mb-3">This year's summary</p>
+              {myStats.total_leaves === 0 ? (
+                <div className="flex flex-col items-center justify-center h-48 text-gray-300">
+                  <MdCalendarMonth className="text-5xl mb-2" />
+                  <p className="text-sm">No leaves this year</p>
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height={200}>
+                  <PieChart>
+                    <Pie data={pieData} cx="50%" cy="50%" innerRadius={55} outerRadius={80} paddingAngle={4} dataKey="value">
+                      {pieData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
+                    </Pie>
+                    <Legend iconType="circle" iconSize={8} formatter={(v) => <span className="text-xs text-gray-600">{v}</span>} />
+                    <Tooltip formatter={(v) => [`${v} requests`]} />
+                  </PieChart>
+                </ResponsiveContainer>
+              )}
+              <div className="grid grid-cols-3 gap-2 mt-2">
+                {[{ label: "Approved", val: myStats.approved, color: "#10b981" },
+                  { label: "Pending",  val: myStats.pending,  color: "#f59e0b" },
+                  { label: "Rejected", val: myStats.rejected, color: "#ef4444" }].map((s) => (
+                  <div key={s.label} className="text-center p-2 rounded-xl bg-gray-50">
+                    <p className="text-lg font-bold" style={{ color: s.color }}>{s.val}</p>
+                    <p className="text-xs text-gray-400">{s.label}</p>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          </div>
+
+          {/* Full My Leaves table */}
+          <motion.div variants={fadeUp} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            {/* Table header + filters */}
+            <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 border-b border-gray-50">
+              <div className="flex items-center gap-2">
+                <MdEventNote className="text-blue-500 text-xl" />
+                <h3 className="font-bold text-gray-900">My Leaves</h3>
+                <span className="ml-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
+                  {myLeaves.length}
+                </span>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <MdFilterList className="text-gray-400 text-lg" />
+                <select value={leaveFilter.status}
+                  onChange={(e) => setLeaveFilter({ ...leaveFilter, status: e.target.value })}
+                  className="input-field w-36 text-sm">
+                  <option value="">All Status</option>
+                  <option value="pending">Pending</option>
+                  <option value="approved">Approved</option>
+                  <option value="rejected">Rejected</option>
+                </select>
+                <select value={leaveFilter.leave_type}
+                  onChange={(e) => setLeaveFilter({ ...leaveFilter, leave_type: e.target.value })}
+                  className="input-field w-36 text-sm">
+                  <option value="">All Types</option>
+                  <option value="casual">Casual</option>
+                  <option value="sick">Sick</option>
+                  <option value="optional">Optional</option>
+                  <option value="maternity">Maternity</option>
+                  <option value="paternity">Paternity</option>
+                  <option value="special">Special</option>
+                  <option value="lop">LOP</option>
+                </select>
+                <select value={leaveFilter.year}
+                  onChange={(e) => setLeaveFilter({ ...leaveFilter, year: Number(e.target.value) })}
+                  className="input-field w-24 text-sm">
+                  {[2024, 2025, 2026].map((y) => <option key={y} value={y}>{y}</option>)}
+                </select>
+                {(leaveFilter.status || leaveFilter.leave_type) && (
+                  <button
+                    onClick={() => setLeaveFilter({ ...leaveFilter, status: "", leave_type: "" })}
+                    className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 bg-gray-100 hover:bg-gray-200 px-2.5 py-1.5 rounded-lg transition-colors">
+                    <MdClose className="text-sm" /> Clear
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {myLeaves.length === 0 ? (
+              <div className="text-center py-16">
+                <div className="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                  <MdEventNote className="text-blue-400 text-2xl" />
+                </div>
+                <p className="text-gray-600 font-semibold">No leave requests found</p>
+                <p className="text-gray-400 text-sm mt-1">Apply for a leave to get started</p>
+                <button onClick={() => navigate("/leaves/apply")}
+                  className="mt-4 px-5 py-2 bg-gradient-to-r from-blue-600 to-violet-600 text-white rounded-xl font-semibold text-sm shadow-md">
+                  Apply Leave
+                </button>
               </div>
             ) : (
-              <ResponsiveContainer width="100%" height={200}>
-                <PieChart>
-                  <Pie data={pieData} cx="50%" cy="50%" innerRadius={55} outerRadius={80} paddingAngle={4} dataKey="value">
-                    {pieData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
-                  </Pie>
-                  <Legend iconType="circle" iconSize={8} formatter={(v) => <span className="text-xs text-gray-600">{v}</span>} />
-                  <Tooltip formatter={(v) => [`${v} requests`]} />
-                </PieChart>
-              </ResponsiveContainer>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-gray-50 border-b border-gray-100">
+                      {["#", "Type", "From", "To", "Days", "Reason", "Status", "Remarks", "Approved By", "Approved On", "Applied On", "Action"].map((h) => (
+                        <th key={h} className="px-4 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {myLeaves.map((l, i) => {
+                      const lc = LEAVE_COLORS[l.leave_type] || { bg: "bg-gray-100", text: "text-gray-600" };
+                      const sc = STATUS_STYLES[l.status] || STATUS_STYLES.cancelled;
+                      return (
+                        <tr key={l.id}
+                          className={`border-b border-gray-100 transition-colors ${i % 2 === 0 ? "bg-white hover:bg-blue-50/30" : "bg-slate-50/60 hover:bg-blue-50/40"}`}>
+                          <td className="px-4 py-3.5 text-gray-300 font-mono text-xs">{i + 1}</td>
+                          <td className="px-4 py-3.5">
+                            <span className={`px-2.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${lc.bg} ${lc.text}`}>
+                              {getLeaveTypeLabel(l)}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3.5 text-gray-700 font-medium">{l.start_date}</td>
+                          <td className="px-4 py-3.5 text-gray-700 font-medium">{l.end_date}</td>
+                          <td className="px-4 py-3.5">
+                            <span className="font-bold text-gray-900">{l.total_days}</span>
+                            <span className="text-gray-400 text-xs ml-1">day{l.total_days !== 1 ? "s" : ""}</span>
+                          </td>
+                          <td className="px-4 py-3.5 text-gray-500 max-w-[160px] truncate">{l.reason}</td>
+                          <td className="px-4 py-3.5">
+                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${sc.bg} ${sc.text}`}>
+                              <span className="w-1.5 h-1.5 rounded-full" style={{ background: sc.dot }} />
+                              {l.status.replace(/_/g, " ")}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3.5 max-w-[180px]">
+                            {l.status === "rejected" && (l.manager_comment || l.main_manager_comment) ? (
+                              <div className="flex items-start gap-1 px-2 py-1 bg-red-50 border border-red-200 rounded-lg">
+                                <span className="text-red-400 text-xs mt-0.5">✕</span>
+                                <span className="text-red-700 text-xs font-medium leading-snug">{l.manager_comment || l.main_manager_comment}</span>
+                              </div>
+                            ) : l.status === "approved" && (l.manager_comment || l.main_manager_comment) ? (
+                              <div className="flex items-start gap-1 px-2 py-1 bg-green-50 border border-green-200 rounded-lg">
+                                <span className="text-green-500 text-xs mt-0.5">✓</span>
+                                <span className="text-green-700 text-xs font-medium leading-snug">{l.manager_comment || l.main_manager_comment}</span>
+                              </div>
+                            ) : (
+                              <span className="text-gray-300 text-xs italic">—</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3.5">
+                            {l.status === "pending" ? (
+                              <span className="text-gray-300 text-xs">—</span>
+                            ) : (() => {
+                              const approver = l.main_manager || l.manager;
+                              return approver ? (
+                                <div className="flex items-center gap-1.5">
+                                  <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-400 to-violet-500 flex items-center justify-center text-white font-bold text-[10px] flex-shrink-0">
+                                    {approver.full_name?.[0]?.toUpperCase()}
+                                  </div>
+                                  <span className="text-xs font-semibold text-gray-700">{approver.full_name}</span>
+                                </div>
+                              ) : <span className="text-gray-300 text-xs">—</span>;
+                            })()}
+                          </td>
+                          <td className="px-4 py-3.5 text-xs text-gray-500 whitespace-nowrap">
+                            {(() => {
+                              const dt = l.main_manager_action_at || l.manager_action_at;
+                              if (!dt) return <span className="text-gray-300">—</span>;
+                              const d = new Date(dt.endsWith("Z") ? dt : dt + "Z");
+                              return (
+                                <div>
+                                  <div className="font-medium text-gray-700">{d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}</div>
+                                  <div className="text-gray-400 text-[10px]">{d.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}</div>
+                                </div>
+                              );
+                            })()}
+                          </td>
+                          <td className="px-4 py-3.5 text-gray-400 text-xs whitespace-nowrap">
+                            {l.created_at ? new Date(l.created_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "—"}
+                          </td>
+                          <td className="px-4 py-3.5">
+                            {l.status === "pending" && (
+                              <button
+                                onClick={() => setCancelTarget(l)}
+                                disabled={cancelling}
+                                className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-orange-600 bg-orange-50 hover:bg-orange-100 border border-orange-200 rounded-lg transition-colors disabled:opacity-50"
+                              >
+                                <MdCancel className="text-sm" /> Withdraw
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             )}
-            <div className="grid grid-cols-3 gap-2 mt-2">
-              {[{ label:"Approved", val: myStats.approved, color:"#10b981" },
-                { label:"Pending",  val: myStats.pending,  color:"#f59e0b" },
-                { label:"Rejected", val: myStats.rejected, color:"#ef4444" }].map((s) => (
-                <div key={s.label} className="text-center p-2 rounded-xl bg-gray-50">
-                  <p className="text-lg font-bold" style={{ color: s.color }}>{s.val}</p>
-                  <p className="text-xs text-gray-400">{s.label}</p>
-                </div>
-              ))}
-            </div>
           </motion.div>
 
-          {/* Recent leaves */}
-          <motion.div variants={fadeUp} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-bold text-gray-900">Recent Leaves</h3>
-              <button
-                onClick={() => navigate("/leaves")}
-                className="text-xs text-blue-600 font-semibold hover:underline"
-              >
-                View all
-              </button>
-            </div>
-            <div className="space-y-3">
-              {myStats.recent_leaves?.length === 0 ? (
-                <div className="text-center py-8 text-gray-300">
-                  <MdEventNote className="text-4xl mx-auto mb-2" />
-                  <p className="text-sm">No leaves yet</p>
-                </div>
-              ) : myStats.recent_leaves?.map((l, i) => (
-                <motion.div
-                  key={l.id}
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: i * 0.1 }}
-                  className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors"
-                >
-                  <div className={`w-2 h-10 rounded-full flex-shrink-0 ${
-                    l.status === "approved" ? "bg-green-400" :
-                    l.status === "pending" ? "bg-amber-400" : "bg-red-400"
-                  }`} />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold capitalize text-gray-800">{l.leave_type} Leave</p>
-                    <p className="text-xs text-gray-400">{l.start_date} → {l.end_date}</p>
-                  </div>
-                  <span className={`badge-${l.status} text-xs`}>{l.status.replace(/_/g, " ")}</span>
-                </motion.div>
-              ))}
-            </div>
-          </motion.div>
-        </div>
+          <AnimatePresence>
+            {cancelTarget && (
+              <CancelConfirmModal
+                leave={cancelTarget}
+                onConfirm={handleConfirmCancel}
+                onCancel={() => setCancelTarget(null)}
+              />
+            )}
+          </AnimatePresence>
+        </>
       )}
 
       {/* On Leave Today Modal */}
@@ -859,8 +1098,8 @@ export default function DashboardPage() {
                         <p className="text-xs text-gray-400">{e.department || "—"}</p>
                       </div>
                       <div className="text-right">
-                        <span className="text-xs font-semibold capitalize px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
-                          {e.leave_type}
+                        <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
+                          {fmtLeaveType(e.leave_type)}
                         </span>
                         <p className="text-xs text-gray-400 mt-0.5">{e.total_days} day(s)</p>
                       </div>

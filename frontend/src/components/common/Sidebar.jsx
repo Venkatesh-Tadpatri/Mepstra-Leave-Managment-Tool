@@ -18,6 +18,7 @@ const navItems = [
   { to: "/holidays/update", icon: MdEditCalendar,      label: "Update Holidays", roles: ["admin","main_manager","hr"],                                  color: "from-violet-500 to-purple-400", end: true },
   { to: "/employees",       icon: MdPeople,            label: "Employees",       roles: ["admin","main_manager","manager","hr"],                         color: "from-teal-500 to-cyan-400",     end: true },
   { to: "/departments",     icon: MdAccountBalance,    label: "Departments",     roles: ["admin","main_manager"],                                        color: "from-red-500 to-pink-400",      end: true },
+  { to: "/admin-wfh",       icon: MdHomeWork,          label: "WFH Report",      roles: ["admin","main_manager","hr","manager","team_lead"],            color: "from-sky-500 to-cyan-400",      end: true },
   { to: "/allowed-emails",  icon: MdShield,            label: "Email Whitelist", roles: ["admin", "hr"],                                                color: "from-emerald-500 to-green-400", end: true },
   { to: "/profile",         icon: MdPerson,            label: "Profile",         roles: ["all"],                                                        color: "from-slate-500 to-gray-400",    end: true },
 ];
@@ -60,7 +61,7 @@ export default function Sidebar() {
       </div>
 
       {/* Nav */}
-      <nav className="mt-3 px-2 space-y-0.5">
+      <nav className="mt-3 px-2 space-y-0.5 overflow-y-auto pb-4" style={{ maxHeight: "calc(100vh - 64px)" }}>
         {visible.map(({ to, icon: Icon, label, color, end }) => (
           <NavLink key={to} to={to} end={end}>
             {({ isActive }) => (

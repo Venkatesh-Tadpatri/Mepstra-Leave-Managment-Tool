@@ -88,6 +88,7 @@ export const getAllWFH = () => API.get("/wfh/all");
 export const getWFHToday = () => API.get("/wfh/today");
 export const actionWFH = (id, data) => API.patch(`/wfh/${id}`, data);
 export const cancelWFH = (id) => API.delete(`/wfh/${id}`);
+export const getWFHReport = (year) => API.get("/wfh/report", { params: { year } });
 
 // Allowed Emails (admin whitelist)
 export const getAllowedEmails = () => API.get("/allowed-emails");

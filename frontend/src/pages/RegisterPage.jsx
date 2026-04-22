@@ -34,7 +34,7 @@ const ROLES = [
   { value: "employee",  label: "Employee",  icon: "👤" },
   { value: "team_lead", label: "Team Lead", icon: "👥" },
   { value: "manager",   label: "Manager",   icon: "🏆" },
-  { value: "hr",        label: "HR",        icon: "🎯" },
+  { value: "hr",        label: "HR/Admin",  icon: "🎯" },
 ];
 
 const BUSINESS_UNITS = [
@@ -265,7 +265,7 @@ export default function RegisterPage() {
       await api.post("/auth/send-otp", { email: form.email.trim().toLowerCase() });
       setOtpSent(true);
       setOtpVerified(false);
-      setOtpTimer(150);
+      setOtpTimer(120);
       setForm((f) => ({ ...f, otp_code: "" }));
       setErrors((e) => ({ ...e, otp_code: "" }));
       setStep(3);
@@ -559,7 +559,7 @@ export default function RegisterPage() {
 
               {/* Employment Type */}
               <div>
-                <label className="block text-xs font-bold text-gray-700 mb-2 uppercase tracking-widest">Employment Type *</label>
+                <label className="block text-xs font-bold text-gray-700 mb-2 uppercase tracking-widest">Employment Type <span className="text-red-500">*</span></label>
                 <div className="grid grid-cols-3 gap-2">
                   {[
                     { value: "intern",    label: "Intern",         icon: "🎓", grad: "from-violet-500 to-purple-600",   light: "bg-violet-50",  ring: "border-violet-400",  text: "text-violet-700"  },
@@ -597,7 +597,7 @@ export default function RegisterPage() {
 
               {/* Business Unit */}
               <div>
-                <label className="block text-xs font-bold text-gray-700 mb-2 uppercase tracking-widest">Business Unit *</label>
+                <label className="block text-xs font-bold text-gray-700 mb-2 uppercase tracking-widest">Business Unit <span className="text-red-500">*</span></label>
                 <div className="grid grid-cols-2 gap-2">
                   {[
                     { value: "mepstra_power_solutions",         label: "Mepstra Power Solutions",                    icon: "⚡", grad: "from-yellow-400 to-orange-500",  light: "bg-orange-50",  ring: "border-orange-400", text: "text-orange-700", desc: "Energy & Power"  },
@@ -765,8 +765,13 @@ export default function RegisterPage() {
                 <div className="text-3xl mb-1">📧</div>
                 <p className="text-xs text-gray-500 font-medium">OTP sent to</p>
                 <p className="text-teal-700 font-bold text-sm">{form.email}</p>
-                {otpTimer > 0 && (
-                  <p className="text-xs text-gray-400 mt-0.5">Expires in <span className="font-bold text-orange-500">{formatTimer(otpTimer)}</span></p>
+                {otpTimer > 0 ? (
+                  <p className="text-sm font-semibold text-gray-600 mt-1">Expires in <span className="text-lg font-extrabold text-orange-500">{formatTimer(otpTimer)}</span></p>
+                ) : (
+                  <div className="mt-2 px-3 py-2 bg-red-50 border border-red-200 rounded-lg">
+                    <p className="text-sm font-bold text-red-600">⏰ OTP Expired!</p>
+                    <p className="text-xs text-red-500 mt-0.5">Please click <strong>Resend</strong> to get a new OTP and verify again.</p>
+                  </div>
                 )}
               </div>
 
@@ -784,7 +789,7 @@ export default function RegisterPage() {
                   className="flex-1 py-2.5 bg-white border-2 border-gray-200 text-gray-700 rounded-lg font-bold text-sm">
                   ← Back
                 </motion.button>
-                <motion.button type="button" disabled={otpSendLoading || otpTimer > 120}
+                <motion.button type="button" disabled={otpSendLoading || otpTimer > 0}
                   onClick={handleSendOtp} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                   className="py-2 px-3 bg-gray-100 text-gray-600 rounded-lg font-semibold text-xs disabled:opacity-40 flex items-center gap-1">
                   {otpSendLoading ? <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 0.8 }} className="w-3 h-3 border-2 border-gray-400/30 border-t-gray-600 rounded-full" /> : <MdRefresh />}
@@ -1145,7 +1150,7 @@ export default function RegisterPage() {
 //       await api.post("/auth/send-otp", { email: form.email });
 //       setOtpSent(true);
 //       setOtpVerified(false);
-//       setOtpTimer(150);
+//       setOtpTimer(120);
 //       toast.success("OTP sent to your email!");
 //     } catch (err) {
 //       const msg = err.response?.data?.detail || "Failed to send OTP";
