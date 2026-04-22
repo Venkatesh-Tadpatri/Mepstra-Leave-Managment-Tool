@@ -129,7 +129,7 @@ class LeaveBalance(Base):
     sick_used = Column(Float, default=0.0)
     optional_total = Column(Float, default=2.0)
     optional_used = Column(Float, default=0.0)
-    maternity_total = Column(Float, default=90.0)
+    maternity_total = Column(Float, default=45.0)
     maternity_used = Column(Float, default=0.0)
     paternity_total = Column(Float, default=5.0)
     paternity_used = Column(Float, default=0.0)

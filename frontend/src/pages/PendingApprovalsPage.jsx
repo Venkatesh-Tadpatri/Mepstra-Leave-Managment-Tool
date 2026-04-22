@@ -310,7 +310,7 @@ export default function PendingApprovalsPage() {
     <motion.div initial="hidden" animate="show" variants={stagger} className="space-y-6">
 
       {/* Header */}
-      <motion.div variants={fadeUp} className="flex items-center justify-between">
+      <motion.div variants={fadeUp} className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-extrabold text-gray-900">
             {isEmployee ? "My Pending Requests" : isHR ? "Leave Requests" : "Pending Approvals"}
@@ -332,10 +332,10 @@ export default function PendingApprovalsPage() {
       </motion.div>
 
       {/* Tabs */}
-      <motion.div variants={fadeUp} className="flex gap-2 bg-gray-100 p-1 rounded-xl w-fit">
+      <motion.div variants={fadeUp} className="flex gap-2 bg-gray-100 p-1 rounded-xl w-full sm:w-fit">
         <button
           onClick={() => setActiveTab("leave")}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+          className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
             activeTab === "leave" ? "bg-white shadow text-gray-900" : "text-gray-500 hover:text-gray-700"
           }`}
         >
@@ -349,7 +349,7 @@ export default function PendingApprovalsPage() {
         </button>
         <button
           onClick={() => setActiveTab("wfh")}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+          className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
             activeTab === "wfh" ? "bg-white shadow text-gray-900" : "text-gray-500 hover:text-gray-700"
           }`}
         >
@@ -433,7 +433,7 @@ export default function PendingApprovalsPage() {
                       )}
                     </div>
                   </div>
-                  <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-50">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mt-4 pt-4 border-t border-gray-50">
                     <p className="text-xs text-gray-400">
                       Applied {format(new Date(leave.created_at), "dd MMM yyyy, hh:mm a")}
                     </p>

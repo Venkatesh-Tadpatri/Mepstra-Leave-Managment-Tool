@@ -23,7 +23,7 @@ const navItems = [
   { to: "/profile",         icon: MdPerson,            label: "Profile",         roles: ["all"],                                                        color: "from-slate-500 to-gray-400",    end: true },
 ];
 
-export default function Sidebar() {
+export default function Sidebar({ isMobile }) {
   const { sidebarOpen } = useSelector((s) => s.ui);
   const { user } = useSelector((s) => s.auth);
   const role = user?.role || "employee";
@@ -32,9 +32,13 @@ export default function Sidebar() {
     (item) => item.roles.includes("all") || item.roles.includes(role)
   );
 
+  // Mobile: slide in/out via x; Desktop: expand/collapse via width
+  const mobileAnimate = sidebarOpen ? { x: 0, width: 210 } : { x: -220, width: 210 };
+  const desktopAnimate = { width: sidebarOpen ? 210 : 68, x: 0 };
+
   return (
     <motion.aside
-      animate={{ width: sidebarOpen ? 210 : 68 }}
+      animate={isMobile ? mobileAnimate : desktopAnimate}
       transition={{ duration: 0.3, ease: "easeInOut" }}
       className="fixed left-0 top-0 h-full z-30 overflow-hidden"
       style={{ background: "linear-gradient(180deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%)" }}
@@ -104,7 +108,6 @@ export default function Sidebar() {
           </NavLink>
         ))}
       </nav>
-
     </motion.aside>
   );
 }

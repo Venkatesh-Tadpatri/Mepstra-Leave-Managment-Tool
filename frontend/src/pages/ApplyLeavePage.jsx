@@ -17,7 +17,7 @@ const ALL_LEAVE_CATEGORIES = [
   { value: "casual",    label: "Casual Leave",       color: "#3b82f6", desc: "12 days/year",             genders: null },
   { value: "sick",      label: "Sick Leave",          color: "#10b981", desc: "6 days/year",              genders: null },
   { value: "optional",  label: "Optional Leave",      color: "#f59e0b", desc: "2 days/year",              genders: null },
-  { value: "maternity", label: "Maternity Leave",     color: "#ec4899", desc: "90 days",                  genders: ["female"] },
+  { value: "maternity", label: "Maternity Leave",     color: "#ec4899", desc: "45 days",                  genders: ["female"] },
   { value: "paternity", label: "Paternity Leave",     color: "#8b5cf6", desc: "5 days",                   genders: ["male"] },
   { value: "compensate",label: "Compensate Leave",    color: "#f97316", desc: "Uses earned Special balance", genders: null },
   { value: "lop",       label: "Leave Without Pay",   color: "#6b7280", desc: "No balance deduction",     genders: null },
@@ -357,7 +357,7 @@ export default function ApplyLeavePage() {
   }
 
   return (
-    <motion.div initial="hidden" animate="show" variants={stagger} className="max-w-3xl mx-auto space-y-5 pb-8">
+    <motion.div initial="hidden" animate="show" variants={stagger} className="space-y-5 pb-8">
       <motion.div variants={fadeUp} className="flex items-center gap-4">
         <motion.button
           whileHover={{ scale: 1.05 }}

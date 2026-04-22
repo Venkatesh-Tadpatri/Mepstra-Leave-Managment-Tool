@@ -143,7 +143,7 @@ export default function LeavesPage() {
     <motion.div initial="hidden" animate="show" variants={stagger} className="space-y-6">
 
       {/* Header */}
-      <motion.div variants={fadeUp} className="flex items-center justify-between">
+      <motion.div variants={fadeUp} className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-extrabold text-gray-900">My Leaves</h1>
           <p className="text-gray-400 text-sm mt-0.5">Track and manage your leave requests</p>
@@ -157,7 +157,7 @@ export default function LeavesPage() {
 
       {/* Balance cards */}
       {balance && (
-        <motion.div variants={fadeUp} className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <motion.div variants={fadeUp} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {BALANCE_CARDS.map((b) => {
             const used  = appliedByType[b.key] ?? (balance[`${b.key}_used`] || 0);
             const total = balance[`${b.key}_total`] || 0;
@@ -199,7 +199,7 @@ export default function LeavesPage() {
           <span className="text-sm font-medium text-gray-500">Filter:</span>
         </div>
         <select value={filter.status} onChange={(e) => setFilter({ ...filter, status: e.target.value })}
-          className="input-field w-44 text-sm">
+          className="input-field flex-1 min-w-[8rem] sm:flex-none sm:w-44 text-sm">
           <option value="">All Status</option>
           <option value="pending">Pending</option>
           <option value="approved">Approved</option>
@@ -207,7 +207,7 @@ export default function LeavesPage() {
           <option value="cancelled">Cancelled</option>
         </select>
         <select value={filter.leave_type} onChange={(e) => setFilter({ ...filter, leave_type: e.target.value })}
-          className="input-field w-40 text-sm">
+          className="input-field flex-1 min-w-[8rem] sm:flex-none sm:w-40 text-sm">
           <option value="">All Types</option>
           <option value="casual">Casual</option>
           <option value="sick">Sick</option>
@@ -218,7 +218,7 @@ export default function LeavesPage() {
           <option value="lop">Leave Without Pay</option>
         </select>
         <select value={filter.year} onChange={(e) => setFilter({ ...filter, year: e.target.value })}
-          className="input-field w-28 text-sm">
+          className="input-field flex-1 min-w-[5rem] sm:flex-none sm:w-28 text-sm">
           {[2024, 2025, 2026].map((y) => <option key={y} value={y}>{y}</option>)}
         </select>
         <AnimatePresence>

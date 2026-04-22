@@ -524,14 +524,14 @@ export default function DashboardPage() {
   return (
     <motion.div initial="hidden" animate="show" variants={stagger} className="space-y-6 pb-6">
       {/* Page header */}
-      <motion.div variants={fadeUp} className="flex items-center justify-between">
+      <motion.div variants={fadeUp} className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-extrabold text-gray-900">Dashboard</h1>
           <p className="text-gray-400 text-sm mt-0.5">
             {new Date().toLocaleDateString("en-IN", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {canExportReport && (
             <>
               <button
@@ -701,7 +701,7 @@ export default function DashboardPage() {
                 <select
                   value={scheduleDept}
                   onChange={(e) => setScheduleDept(Number(e.target.value))}
-                  className="input-field text-sm w-40"
+                  className="input-field text-sm flex-1 min-w-[8rem] sm:flex-none sm:w-40"
                 >
                   <option value={0}>All Departments</option>
                   {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
@@ -720,7 +720,7 @@ export default function DashboardPage() {
                       setScheduleYear(d.getFullYear());
                     }
                   }}
-                  className="input-field text-sm w-40"
+                  className="input-field text-sm flex-1 min-w-[8rem] sm:flex-none sm:w-40"
                 />
                 {scheduleDay && (
                   <button
@@ -737,7 +737,7 @@ export default function DashboardPage() {
                   <select
                     value={scheduleMonth}
                     onChange={(e) => setScheduleMonth(Number(e.target.value))}
-                    className="input-field text-sm w-36"
+                    className="input-field text-sm flex-1 min-w-[7rem] sm:flex-none sm:w-36"
                   >
                     {["January","February","March","April","May","June","July","August","September","October","November","December"]
                       .map((m, i) => <option key={i + 1} value={i + 1}>{m}</option>)}
@@ -745,7 +745,7 @@ export default function DashboardPage() {
                   <select
                     value={scheduleYear}
                     onChange={(e) => setScheduleYear(Number(e.target.value))}
-                    className="input-field text-sm w-24"
+                    className="input-field text-sm flex-1 min-w-[5rem] sm:flex-none sm:w-24"
                   >
                     {[2024, 2025, 2026, 2027].map((y) => <option key={y} value={y}>{y}</option>)}
                   </select>
@@ -833,7 +833,7 @@ export default function DashboardPage() {
       {showLeaveTable && myStats && (
         <>
           {/* Balance + Pie row */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             {/* Balance card */}
             <motion.div variants={fadeUp} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
               <div className="flex items-center justify-between mb-4">
@@ -900,7 +900,7 @@ export default function DashboardPage() {
                 <MdFilterList className="text-gray-400 text-lg" />
                 <select value={leaveFilter.status}
                   onChange={(e) => setLeaveFilter({ ...leaveFilter, status: e.target.value })}
-                  className="input-field w-36 text-sm">
+                  className="input-field flex-1 min-w-[7rem] sm:flex-none sm:w-36 text-sm">
                   <option value="">All Status</option>
                   <option value="pending">Pending</option>
                   <option value="approved">Approved</option>
@@ -908,7 +908,7 @@ export default function DashboardPage() {
                 </select>
                 <select value={leaveFilter.leave_type}
                   onChange={(e) => setLeaveFilter({ ...leaveFilter, leave_type: e.target.value })}
-                  className="input-field w-36 text-sm">
+                  className="input-field flex-1 min-w-[7rem] sm:flex-none sm:w-36 text-sm">
                   <option value="">All Types</option>
                   <option value="casual">Casual</option>
                   <option value="sick">Sick</option>
@@ -920,7 +920,7 @@ export default function DashboardPage() {
                 </select>
                 <select value={leaveFilter.year}
                   onChange={(e) => setLeaveFilter({ ...leaveFilter, year: Number(e.target.value) })}
-                  className="input-field w-24 text-sm">
+                  className="input-field flex-1 min-w-[5rem] sm:flex-none sm:w-24 text-sm">
                   {[2024, 2025, 2026].map((y) => <option key={y} value={y}>{y}</option>)}
                 </select>
                 {(leaveFilter.status || leaveFilter.leave_type) && (

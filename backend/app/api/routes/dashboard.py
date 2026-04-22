@@ -303,7 +303,7 @@ def employee_leave_report(
         optional_used = balance.optional_used if balance else 0.0
         special_total = balance.special_total if balance else 0.0
         special_used = balance.special_used if balance else 0.0
-        maternity_total = balance.maternity_total if balance else 90.0
+        maternity_total = balance.maternity_total if balance else 45.0
         maternity_used = balance.maternity_used if balance else 0.0
         paternity_total = balance.paternity_total if balance else 5.0
         paternity_used = balance.paternity_used if balance else 0.0

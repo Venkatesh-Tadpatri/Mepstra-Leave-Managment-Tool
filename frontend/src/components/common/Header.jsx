@@ -38,7 +38,7 @@ export default function Header() {
   const gradient = ROLE_COLORS[user?.role] || "from-blue-500 to-indigo-500";
 
   return (
-    <header className="h-16 bg-white/80 backdrop-blur-md border-b border-gray-100 flex items-center justify-between px-6 sticky top-0 z-20 shadow-sm">
+    <header className="h-16 bg-white/80 backdrop-blur-md border-b border-gray-100 flex items-center justify-between px-3 md:px-6 sticky top-0 z-20 shadow-sm">
       <div className="flex items-center gap-3">
         <motion.button
           whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
@@ -61,7 +61,7 @@ export default function Header() {
               👋
             </motion.span>
           </p>
-          <p className="text-xs text-gray-400 capitalize">{user?.role === "hr" ? "HR/Admin" : user?.role?.replace(/_/g, " ")} · {user?.department?.name || "Mepstra"}</p>
+          <p className="text-xs text-gray-400">{user?.department?.name || "Mepstra"}</p>
         </div>
       </div>
 
@@ -116,7 +116,7 @@ export default function Header() {
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: -8, scale: 0.95 }}
                 transition={{ duration: 0.15 }}
-                className="absolute right-0 top-12 w-72 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden z-50"
+                className="absolute right-0 top-12 w-64 sm:w-72 max-w-[calc(100vw-1rem)] bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden z-50"
               >
                 <div className={`p-4 bg-gradient-to-br ${gradient}`}>
                   <div className="flex items-center gap-3">
