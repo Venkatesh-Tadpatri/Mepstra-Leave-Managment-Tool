@@ -526,7 +526,9 @@ export default function AllowedEmailsPage() {
                           min={0}
                           max={365}
                           value={form[key]}
-                          onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
+                          onChange={(e) => setForm((f) => ({ ...f, [key]: Number(e.target.value) }))}
+                          onKeyDown={(e) => { if (!["ArrowUp", "ArrowDown", "Tab"].includes(e.key)) e.preventDefault(); }}
+                          onPaste={(e) => e.preventDefault()}
                           className={`w-full text-center text-base font-extrabold text-${color}-700 bg-transparent border-b-2 border-${color}-200 focus:outline-none focus:border-${color}-500`}
                         />
                       </div>
