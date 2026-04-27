@@ -22,6 +22,15 @@ def _column_exists(conn, table: str, column: str) -> bool:
     return result.scalar() > 0
 
 
+def _table_exists(conn, table: str) -> bool:
+    result = conn.execute(text(
+        "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES "
+        "WHERE TABLE_SCHEMA = DATABASE() "
+        "AND TABLE_NAME = :table"
+    ), {"table": table})
+    return result.scalar() > 0
+
+
 def _get_column_type(conn, table: str, column: str) -> str:
     result = conn.execute(text(
         "SELECT COLUMN_TYPE FROM INFORMATION_SCHEMA.COLUMNS "
@@ -172,6 +181,16 @@ def run_migrations():
             ))
             conn.commit()
 
+        # ── leave_requests.status → extend ENUM with REVOKED ─────────────
+        col_type = _get_column_type(conn, "leave_requests", "status")
+        if "'REVOKED'" not in col_type:
+            logger.info("Extending leave_requests.status ENUM with REVOKED")
+            conn.execute(text(
+                "ALTER TABLE leave_requests MODIFY COLUMN status "
+                "ENUM('PENDING','APPROVED_BY_MANAGER','APPROVED','REJECTED','CANCELLED','REVOKED') NOT NULL"
+            ))
+            conn.commit()
+
         # ── users: new personal detail columns ───────────────────────────
         if not _column_exists(conn, "users", "date_of_birth"):
             logger.info("Adding users.date_of_birth")
@@ -291,6 +310,21 @@ def run_migrations():
                     f"ALTER TABLE allowed_emails ADD COLUMN {col} FLOAT NOT NULL DEFAULT {default}"
                 ))
                 conn.commit()
+
+        # registration_otps: move from older hashed OTP column to plain OTP column.
+        # Existing OTP rows are temporary, so it is safe to clear them during shape changes.
+        if _table_exists(conn, "registration_otps") and not _column_exists(conn, "registration_otps", "otp"):
+            logger.info("Adding registration_otps.otp")
+            conn.execute(text("DELETE FROM registration_otps"))
+            conn.execute(text(
+                "ALTER TABLE registration_otps ADD COLUMN otp VARCHAR(6) NOT NULL AFTER email"
+            ))
+            conn.commit()
+        if _table_exists(conn, "registration_otps") and _column_exists(conn, "registration_otps", "otp_hash"):
+            logger.info("Dropping registration_otps.otp_hash")
+            conn.execute(text("DELETE FROM registration_otps"))
+            conn.execute(text("ALTER TABLE registration_otps DROP COLUMN otp_hash"))
+            conn.commit()
 
         logger.info("Schema migrations complete.")
         print("Schema migrations applied successfully.")

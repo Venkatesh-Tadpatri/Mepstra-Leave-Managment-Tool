@@ -5,6 +5,7 @@ import { MdMenu, MdNotifications, MdLogout, MdPerson } from "react-icons/md";
 import { toggleSidebar } from "../../store/slices/uiSlice";
 import { logout } from "../../store/slices/authSlice";
 import { useState, useRef, useEffect } from "react";
+import UserAvatar from "./UserAvatar";
 
 const ROLE_COLORS = {
   admin: "from-red-500 to-pink-500",
@@ -92,17 +93,7 @@ export default function Header() {
             onClick={() => setDropOpen(!dropOpen)}
             className="flex items-center gap-2.5 pl-2 pr-3 py-1.5 rounded-xl hover:bg-gray-50 border border-transparent hover:border-gray-200 transition-all"
           >
-            {user?.profile_image ? (
-              <img
-                src={`http://localhost:8000${user.profile_image}`}
-                alt={user.full_name}
-                className="w-8 h-8 rounded-lg object-cover shadow-md"
-              />
-            ) : (
-              <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${gradient} flex items-center justify-center text-white text-sm font-bold shadow-md`}>
-                {user?.full_name?.[0]?.toUpperCase()}
-              </div>
-            )}
+            <UserAvatar name={user?.full_name} profileImage={user?.profile_image} size="sm" className="shadow-md" />
             <div className="hidden sm:block text-left max-w-[120px]">
               <p className="text-xs font-semibold text-gray-800 leading-tight truncate">{user?.full_name}</p>
               <p className="text-xs text-gray-400 capitalize leading-tight">{user?.role === "hr" ? "HR/Admin" : user?.role?.replace(/_/g, " ")}</p>
@@ -120,17 +111,7 @@ export default function Header() {
               >
                 <div className={`p-4 bg-gradient-to-br ${gradient}`}>
                   <div className="flex items-center gap-3">
-                    {user?.profile_image ? (
-                      <img
-                        src={`http://localhost:8000${user.profile_image}`}
-                        alt={user.full_name}
-                        className="w-10 h-10 rounded-xl object-cover"
-                      />
-                    ) : (
-                    <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center text-white font-bold">
-                      {user?.full_name?.[0]?.toUpperCase()}
-                    </div>
-                    )}
+                    <UserAvatar name={user?.full_name} profileImage={user?.profile_image} size="md" />
                     <div className="min-w-0 flex-1">
                       <p className="text-white text-sm font-semibold truncate">{user?.full_name}</p>
                       <p className="text-white/70 text-xs break-all leading-snug mt-0.5">{user?.email}</p>

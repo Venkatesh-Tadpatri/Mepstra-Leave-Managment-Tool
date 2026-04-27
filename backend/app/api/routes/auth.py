@@ -3,7 +3,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from app.db.database import get_db
 from app.schemas.schemas import Token, LoginRequest, UserCreate, UserResponse, OTPSendRequest, OTPVerifyRequest
-from app.models.models import User, UserRole, AllowedEmail
+from app.models.models import User, UserRole, AllowedEmail, RegistrationOTP
 from app.models.models import Department
 from app.core.security import verify_password, get_password_hash, create_access_token
 from app.services.leave_service import get_or_create_balance
@@ -16,14 +16,15 @@ from sqlalchemy import or_
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
-# ─── In-memory OTP store: email -> {"otp": str, "expires": datetime, "verified": bool}
-_otp_store: dict = {}
-
 OTP_EXPIRY_SECONDS = 120  # 2 minutes
 
 
 def _generate_otp() -> str:
     return str(secrets.randbelow(900000) + 100000)  # 6-digit OTP
+
+
+def _utcnow() -> datetime:
+    return datetime.utcnow()
 
 
 def _email_candidates(email: str) -> list[str]:
@@ -107,11 +108,22 @@ def send_otp(data: OTPSendRequest, background_tasks: BackgroundTasks, db: Sessio
             )
 
     otp = _generate_otp()
-    _otp_store[email] = {
-        "otp": otp,
-        "expires": datetime.utcnow() + timedelta(seconds=OTP_EXPIRY_SECONDS),
-        "verified": False,
-    }
+    expires_at = _utcnow() + timedelta(seconds=OTP_EXPIRY_SECONDS)
+    otp_record = db.query(RegistrationOTP).filter(RegistrationOTP.email == email).first()
+    if otp_record:
+        otp_record.otp = otp
+        otp_record.expires_at = expires_at
+        otp_record.verified_at = None
+        otp_record.attempts = 0
+    else:
+        db.add(RegistrationOTP(
+            email=email,
+            otp=otp,
+            expires_at=expires_at,
+            verified_at=None,
+            attempts=0,
+        ))
+    db.commit()
 
     # Send email in background — response returns immediately, no waiting for SMTP
     background_tasks.add_task(send_otp_email, email, otp)
@@ -124,20 +136,23 @@ def send_otp(data: OTPSendRequest, background_tasks: BackgroundTasks, db: Sessio
 
 
 @router.post("/verify-otp", status_code=200)
-def verify_otp(data: OTPVerifyRequest):
+def verify_otp(data: OTPVerifyRequest, db: Session = Depends(get_db)):
     """Verify OTP before completing registration."""
     email = data.email.strip().lower()
-    record = _otp_store.get(email)
+    record = db.query(RegistrationOTP).filter(RegistrationOTP.email == email).first()
     if not record:
         raise HTTPException(status_code=400, detail="No OTP found for this email. Please request a new one.")
-    if datetime.utcnow() > record["expires"]:
-        del _otp_store[email]
+    if _utcnow() > record.expires_at:
+        db.delete(record)
+        db.commit()
         raise HTTPException(status_code=400, detail="OTP has expired. Please request a new one.")
-    if record["otp"] != data.otp.strip():
+    if record.otp != data.otp.strip():
+        record.attempts += 1
+        db.commit()
         raise HTTPException(status_code=400, detail="Invalid OTP. Please try again.")
 
-    # Mark as verified
-    _otp_store[email]["verified"] = True
+    record.verified_at = _utcnow()
+    db.commit()
     return {"message": "OTP verified successfully. You may now complete registration."}
 
 
@@ -145,14 +160,15 @@ def verify_otp(data: OTPVerifyRequest):
 def register(data: UserCreate, db: Session = Depends(get_db)):
     email = data.email.strip().lower()
 
-    # Check OTP verification (required when OTP was requested)
-    otp_record = _otp_store.get(email)
-    if otp_record:
-        if not otp_record.get("verified"):
-            raise HTTPException(status_code=400, detail="Email OTP not verified. Please verify your OTP first.")
-        if datetime.utcnow() > otp_record["expires"]:
-            del _otp_store[email]
-            raise HTTPException(status_code=400, detail="OTP session expired. Please request a new OTP.")
+    otp_record = db.query(RegistrationOTP).filter(RegistrationOTP.email == email).first()
+    if not otp_record:
+        raise HTTPException(status_code=400, detail="Please request and verify an OTP before registration.")
+    if _utcnow() > otp_record.expires_at:
+        db.delete(otp_record)
+        db.commit()
+        raise HTTPException(status_code=400, detail="OTP session expired. Please request a new OTP.")
+    if not otp_record.verified_at:
+        raise HTTPException(status_code=400, detail="Email OTP not verified. Please verify your OTP first.")
 
     # Check against allowed email whitelist (if the list is non-empty, only those emails may register)
     whitelist_entry = None
@@ -228,8 +244,7 @@ def register(data: UserCreate, db: Session = Depends(get_db)):
         whitelist_entry.registered_user_id = user.id
         db.commit()
 
-    # Clean up OTP record after successful registration
-    if email in _otp_store:
-        del _otp_store[email]
+    db.delete(otp_record)
+    db.commit()
 
     return user

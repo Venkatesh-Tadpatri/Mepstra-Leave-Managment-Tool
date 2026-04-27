@@ -289,6 +289,7 @@ def wfh_report(
         if uid not in emp_map:
             emp_map[uid] = {
                 "employee_name": r.user.full_name if r.user else "—",
+                "profile_image": r.user.profile_image if r.user else None,
                 "department": r.user.department.name if r.user and r.user.department else "—",
                 "count": 0.0,
                 "dates": [],

@@ -5,6 +5,7 @@ import { getUsers, updateUser, getDepartments, getTeamOverridesToday, enableEmer
 import toast from "react-hot-toast";
 import { motion, AnimatePresence } from "framer-motion";
 import { MdSearch, MdClose, MdPeople, MdFilterList, MdLockReset, MdBlock, MdCheckCircle } from "react-icons/md";
+import UserAvatar from "../components/common/UserAvatar";
 
 const ROLE_STYLES = {
   employee:     { bg: "bg-blue-100",   text: "text-blue-700",    label: "Employee" },
@@ -229,17 +230,7 @@ export default function EmployeesPage() {
                     className={`border-b border-gray-100 transition-colors ${i % 2 === 0 ? "bg-white hover:bg-blue-50/30" : "bg-slate-50/60 hover:bg-blue-50/40"}`}>
                     <td className="px-4 py-3.5">
                       <div className="flex items-center gap-3">
-                        {u.profile_image ? (
-                          <img
-                            src={`http://localhost:8000${u.profile_image}`}
-                            alt={u.full_name}
-                            className="w-9 h-9 rounded-xl object-cover shadow-sm flex-shrink-0"
-                          />
-                        ) : (
-                          <div className={`w-9 h-9 bg-gradient-to-br ${avatarColor} rounded-xl flex items-center justify-center text-white text-xs font-bold shadow-sm flex-shrink-0`}>
-                            {u.full_name[0].toUpperCase()}
-                          </div>
-                        )}
+                        <UserAvatar name={u.full_name} profileImage={u.profile_image} size="sm" />
                         <div>
                           <p className="font-semibold text-gray-900">{u.full_name}</p>
                           <p className="text-xs text-gray-400">{u.email}</p>

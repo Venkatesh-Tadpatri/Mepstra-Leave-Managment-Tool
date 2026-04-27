@@ -14,6 +14,7 @@ import {
   MdFileDownload, MdPictureAsPdf, MdClose, MdBeachAccess, MdLaptop,
   MdFilterList, MdCancel, MdWarning, MdAdd
 } from "react-icons/md";
+import UserAvatar from "../components/common/UserAvatar";
 
 const fadeUp = { hidden: { opacity: 0, y: 24 }, show: { opacity: 1, y: 0 } };
 const stagger = { show: { transition: { staggerChildren: 0.08 } } };
@@ -608,9 +609,7 @@ export default function DashboardPage() {
                     <tr key={e.id} className={`border-b border-gray-100 transition-colors ${i % 2 === 0 ? "bg-white hover:bg-blue-50/30" : "bg-slate-50/60 hover:bg-blue-50/40"}`}>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center text-white font-bold text-xs flex-shrink-0">
-                            {e.employee_name?.[0]?.toUpperCase()}
-                          </div>
+                          <UserAvatar name={e.employee_name} profileImage={e.profile_image} size="sm" />
                           <span className="font-semibold text-gray-800">{e.employee_name}</span>
                         </div>
                       </td>
@@ -666,9 +665,7 @@ export default function DashboardPage() {
                     <tr key={e.id} className={`border-b border-gray-100 transition-colors ${i % 2 === 0 ? "bg-white hover:bg-blue-50/30" : "bg-slate-50/60 hover:bg-blue-50/40"}`}>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-400 to-violet-500 flex items-center justify-center text-white font-bold text-xs flex-shrink-0">
-                            {e.employee_name?.[0]?.toUpperCase()}
-                          </div>
+                          <UserAvatar name={e.employee_name} profileImage={e.profile_image} size="sm" />
                           <span className="font-semibold text-gray-800">{e.employee_name}</span>
                         </div>
                       </td>
@@ -775,9 +772,7 @@ export default function DashboardPage() {
                       <td className="px-4 py-3 text-gray-300 font-mono text-xs">{i + 1}</td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-400 to-purple-500 flex items-center justify-center text-white font-bold text-xs flex-shrink-0">
-                            {e.employee_name?.[0]?.toUpperCase()}
-                          </div>
+                          <UserAvatar name={e.employee_name} profileImage={e.profile_image} size="sm" />
                           <span className="font-semibold text-gray-800">{e.employee_name}</span>
                         </div>
                       </td>
@@ -1090,9 +1085,7 @@ export default function DashboardPage() {
                 <div className="space-y-3">
                   {onLeaveList.map((e) => (
                     <div key={e.id} className="flex items-center gap-3 p-3 rounded-xl bg-gray-50">
-                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
-                        {e.employee_name?.[0]?.toUpperCase()}
-                      </div>
+                      <UserAvatar name={e.employee_name} profileImage={e.profile_image} size="md" />
                       <div className="flex-1 min-w-0">
                         <p className="font-semibold text-gray-900 text-sm">{e.employee_name}</p>
                         <p className="text-xs text-gray-400">{e.department || "—"}</p>

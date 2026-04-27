@@ -187,7 +187,7 @@ export default function LoginPage() {
                 <MdLock className="text-base" />
               </div>
               <div className="min-w-0">
-                <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-blue-600/80">Welcome Back — Login</p>
+                <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-blue-600/80">Welcome</p>
                 <h2 className="text-lg font-extrabold leading-tight text-gray-900">Sign In</h2>
               </div>
             </div>

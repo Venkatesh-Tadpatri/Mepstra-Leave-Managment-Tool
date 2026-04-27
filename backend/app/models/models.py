@@ -55,6 +55,7 @@ class LeaveStatus(str, enum.Enum):
     APPROVED = "approved"
     REJECTED = "rejected"
     CANCELLED = "cancelled"
+    REVOKED = "revoked"
 
 
 class HolidayType(str, enum.Enum):
@@ -202,6 +203,19 @@ class AllowedEmail(Base):
     added_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     registered_user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class RegistrationOTP(Base):
+    __tablename__ = "registration_otps"
+
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String(255), unique=True, nullable=False, index=True)
+    otp = Column(String(6), nullable=False)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    verified_at = Column(DateTime(timezone=True), nullable=True)
+    attempts = Column(Integer, default=0, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
 
 class WFHStatus(str, enum.Enum):

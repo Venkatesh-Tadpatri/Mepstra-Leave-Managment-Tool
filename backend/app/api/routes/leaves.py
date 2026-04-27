@@ -222,21 +222,20 @@ def action_leave(leave_id: int, data: LeaveRequestUpdate, background_tasks: Back
         # Authorize by employee's assigned manager (not leave routing — admin may have been auto-routed)
         if employee.manager_id != current_user.id:
             raise HTTPException(403, "Not your team's leave")
-        if leave.status != LeaveStatus.PENDING:
-            raise HTTPException(400, "Leave is not pending")
-        if data.action == "approve":
-            leave.status = LeaveStatus.APPROVED
+
+        if data.action == "revoke":
+            if leave.status != LeaveStatus.APPROVED:
+                raise HTTPException(400, "Only approved leaves can be revoked")
+            leave.status = LeaveStatus.REVOKED
             balance = get_or_create_balance(leave.user_id, leave.start_date.year, db)
-            if _is_weekend_work_request(leave):
-                _credit_special_leave(leave, balance, db)
-            else:
-                deduct_leave(balance, leave.leave_type, leave.total_days)
+            if not _is_weekend_work_request(leave):
+                restore_leave(balance, leave.leave_type, leave.total_days)
             db.commit()
             background_tasks.add_task(
                 send_leave_status_email,
                 employee.email, employee.full_name,
                 leave.leave_type.value, leave.start_date, leave.end_date,
-                leave.total_days, "approved", data.comment or "", leave.reason
+                leave.total_days, "revoked", data.comment or "", leave.reason
             )
             if employee.hr_id:
                 hr = db.query(User).filter(User.id == employee.hr_id).first()
@@ -245,45 +244,69 @@ def action_leave(leave_id: int, data: LeaveRequestUpdate, background_tasks: Back
                         send_leave_status_email,
                         hr.email, hr.full_name,
                         leave.leave_type.value, leave.start_date, leave.end_date,
-                        leave.total_days, "approved", data.comment or "", leave.reason
+                        leave.total_days, "revoked", data.comment or "", leave.reason
                     )
         else:
-            leave.status = LeaveStatus.REJECTED
-            background_tasks.add_task(
-                send_leave_status_email,
-                employee.email, employee.full_name,
-                leave.leave_type.value, leave.start_date, leave.end_date,
-                leave.total_days, "rejected", data.comment or "", leave.reason
-            )
-            if employee.hr_id:
-                hr = db.query(User).filter(User.id == employee.hr_id).first()
-                if hr:
-                    background_tasks.add_task(
-                        send_leave_status_email,
-                        hr.email, hr.full_name,
-                        leave.leave_type.value, leave.start_date, leave.end_date,
-                        leave.total_days, "rejected", data.comment or "", leave.reason
-                    )
+            if leave.status != LeaveStatus.PENDING:
+                raise HTTPException(400, "Leave is not pending")
+            if data.action == "approve":
+                leave.status = LeaveStatus.APPROVED
+                balance = get_or_create_balance(leave.user_id, leave.start_date.year, db)
+                if _is_weekend_work_request(leave):
+                    _credit_special_leave(leave, balance, db)
+                else:
+                    deduct_leave(balance, leave.leave_type, leave.total_days)
+                db.commit()
+                background_tasks.add_task(
+                    send_leave_status_email,
+                    employee.email, employee.full_name,
+                    leave.leave_type.value, leave.start_date, leave.end_date,
+                    leave.total_days, "approved", data.comment or "", leave.reason
+                )
+                if employee.hr_id:
+                    hr = db.query(User).filter(User.id == employee.hr_id).first()
+                    if hr:
+                        background_tasks.add_task(
+                            send_leave_status_email,
+                            hr.email, hr.full_name,
+                            leave.leave_type.value, leave.start_date, leave.end_date,
+                            leave.total_days, "approved", data.comment or "", leave.reason
+                        )
+            else:
+                leave.status = LeaveStatus.REJECTED
+                background_tasks.add_task(
+                    send_leave_status_email,
+                    employee.email, employee.full_name,
+                    leave.leave_type.value, leave.start_date, leave.end_date,
+                    leave.total_days, "rejected", data.comment or "", leave.reason
+                )
+                if employee.hr_id:
+                    hr = db.query(User).filter(User.id == employee.hr_id).first()
+                    if hr:
+                        background_tasks.add_task(
+                            send_leave_status_email,
+                            hr.email, hr.full_name,
+                            leave.leave_type.value, leave.start_date, leave.end_date,
+                            leave.total_days, "rejected", data.comment or "", leave.reason
+                        )
         leave.manager_comment = data.comment
         leave.manager_action = data.action
         leave.manager_action_at = datetime.utcnow()
 
     elif current_user.role in [UserRole.MAIN_MANAGER, UserRole.ADMIN]:
-        if leave.status != LeaveStatus.PENDING:
-            raise HTTPException(400, "Leave cannot be actioned at this stage")
-        if data.action == "approve":
-            leave.status = LeaveStatus.APPROVED
+        if data.action == "revoke":
+            if leave.status != LeaveStatus.APPROVED:
+                raise HTTPException(400, "Only approved leaves can be revoked")
+            leave.status = LeaveStatus.REVOKED
             balance = get_or_create_balance(leave.user_id, leave.start_date.year, db)
-            if _is_weekend_work_request(leave):
-                _credit_special_leave(leave, balance, db)
-            else:
-                deduct_leave(balance, leave.leave_type, leave.total_days)
+            if not _is_weekend_work_request(leave):
+                restore_leave(balance, leave.leave_type, leave.total_days)
             db.commit()
             background_tasks.add_task(
                 send_leave_status_email,
                 employee.email, employee.full_name,
                 leave.leave_type.value, leave.start_date, leave.end_date,
-                leave.total_days, "approved", data.comment or "", leave.reason
+                leave.total_days, "revoked", data.comment or "", leave.reason
             )
             if employee.hr_id:
                 hr = db.query(User).filter(User.id == employee.hr_id).first()
@@ -292,44 +315,70 @@ def action_leave(leave_id: int, data: LeaveRequestUpdate, background_tasks: Back
                         send_leave_status_email,
                         hr.email, hr.full_name,
                         leave.leave_type.value, leave.start_date, leave.end_date,
-                        leave.total_days, "approved", data.comment or "", leave.reason
-                    )
-            else:
-                hr_users = db.query(User).filter(User.role == UserRole.HR, User.is_active == True).all()
-                for hr in hr_users:
-                    background_tasks.add_task(
-                        send_leave_status_email,
-                        hr.email, hr.full_name,
-                        leave.leave_type.value, leave.start_date, leave.end_date,
-                        leave.total_days, "approved", data.comment or "", leave.reason
-                    )
-            if leave.manager_id and leave.manager_id != current_user.id:
-                assigned_mgr = db.query(User).filter(User.id == leave.manager_id).first()
-                if assigned_mgr and assigned_mgr.role not in [UserRole.ADMIN, UserRole.MAIN_MANAGER]:
-                    background_tasks.add_task(
-                        send_admin_approved_manager_notification,
-                        assigned_mgr.email, assigned_mgr.full_name,
-                        employee.full_name, leave.leave_type.value,
-                        leave.start_date, leave.end_date, leave.total_days,
-                        leave.reason, data.comment or ""
+                        leave.total_days, "revoked", data.comment or "", leave.reason
                     )
         else:
-            leave.status = LeaveStatus.REJECTED
-            background_tasks.add_task(
-                send_leave_status_email,
-                employee.email, employee.full_name,
-                leave.leave_type.value, leave.start_date, leave.end_date,
-                leave.total_days, "rejected", data.comment or "", leave.reason
-            )
-            if employee.hr_id:
-                hr = db.query(User).filter(User.id == employee.hr_id).first()
-                if hr:
-                    background_tasks.add_task(
-                        send_leave_status_email,
-                        hr.email, hr.full_name,
-                        leave.leave_type.value, leave.start_date, leave.end_date,
-                        leave.total_days, "rejected", data.comment or "", leave.reason
-                    )
+            if leave.status != LeaveStatus.PENDING:
+                raise HTTPException(400, "Leave cannot be actioned at this stage")
+            if data.action == "approve":
+                leave.status = LeaveStatus.APPROVED
+                balance = get_or_create_balance(leave.user_id, leave.start_date.year, db)
+                if _is_weekend_work_request(leave):
+                    _credit_special_leave(leave, balance, db)
+                else:
+                    deduct_leave(balance, leave.leave_type, leave.total_days)
+                db.commit()
+                background_tasks.add_task(
+                    send_leave_status_email,
+                    employee.email, employee.full_name,
+                    leave.leave_type.value, leave.start_date, leave.end_date,
+                    leave.total_days, "approved", data.comment or "", leave.reason
+                )
+                if employee.hr_id:
+                    hr = db.query(User).filter(User.id == employee.hr_id).first()
+                    if hr:
+                        background_tasks.add_task(
+                            send_leave_status_email,
+                            hr.email, hr.full_name,
+                            leave.leave_type.value, leave.start_date, leave.end_date,
+                            leave.total_days, "approved", data.comment or "", leave.reason
+                        )
+                else:
+                    hr_users = db.query(User).filter(User.role == UserRole.HR, User.is_active == True).all()
+                    for hr in hr_users:
+                        background_tasks.add_task(
+                            send_leave_status_email,
+                            hr.email, hr.full_name,
+                            leave.leave_type.value, leave.start_date, leave.end_date,
+                            leave.total_days, "approved", data.comment or "", leave.reason
+                        )
+                if leave.manager_id and leave.manager_id != current_user.id:
+                    assigned_mgr = db.query(User).filter(User.id == leave.manager_id).first()
+                    if assigned_mgr and assigned_mgr.role not in [UserRole.ADMIN, UserRole.MAIN_MANAGER]:
+                        background_tasks.add_task(
+                            send_admin_approved_manager_notification,
+                            assigned_mgr.email, assigned_mgr.full_name,
+                            employee.full_name, leave.leave_type.value,
+                            leave.start_date, leave.end_date, leave.total_days,
+                            leave.reason, data.comment or ""
+                        )
+            else:
+                leave.status = LeaveStatus.REJECTED
+                background_tasks.add_task(
+                    send_leave_status_email,
+                    employee.email, employee.full_name,
+                    leave.leave_type.value, leave.start_date, leave.end_date,
+                    leave.total_days, "rejected", data.comment or "", leave.reason
+                )
+                if employee.hr_id:
+                    hr = db.query(User).filter(User.id == employee.hr_id).first()
+                    if hr:
+                        background_tasks.add_task(
+                            send_leave_status_email,
+                            hr.email, hr.full_name,
+                            leave.leave_type.value, leave.start_date, leave.end_date,
+                            leave.total_days, "rejected", data.comment or "", leave.reason
+                        )
         leave.main_manager_id = current_user.id
         leave.main_manager_comment = data.comment
         leave.main_manager_action = data.action

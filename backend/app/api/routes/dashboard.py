@@ -151,6 +151,7 @@ def on_leave_today(db: Session = Depends(get_db), current_user: User = Depends(g
         {
             "id": leave.id,
             "employee_name": user.full_name,
+            "profile_image": user.profile_image,
             "department": dept.name if dept else None,
             "leave_type": leave.leave_type.value,
             "start_date": str(leave.start_date),
@@ -233,6 +234,7 @@ def leave_schedule(
         {
             "id": leave.id,
             "employee_name": user.full_name,
+            "profile_image": user.profile_image,
             "department": dept.name if dept else "—",
             "leave_type": leave.leave_type.value,
             "start_date": str(leave.start_date),

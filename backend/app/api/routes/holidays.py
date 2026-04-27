@@ -7,10 +7,7 @@ from app.schemas.schemas import HolidayCreate, HolidayResponse
 from app.models.models import Holiday
 from datetime import date
 
-
-
 router = APIRouter(prefix="/holidays", tags=["Holidays"])
-
 
 @router.get("", response_model=List[HolidayResponse])
 def list_holidays(year: Optional[int] = None, db: Session = Depends(get_db),

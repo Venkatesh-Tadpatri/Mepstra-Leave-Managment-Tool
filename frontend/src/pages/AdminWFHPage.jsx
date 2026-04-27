@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { format, parseISO } from "date-fns";
 import { getWFHReport } from "../services/api";
 import toast from "react-hot-toast";
+import UserAvatar from "../components/common/UserAvatar";
 import { MdHomeWork, MdPeople, MdCalendarMonth, MdBarChart, MdClose, MdArrowForward } from "react-icons/md";
 
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
@@ -40,9 +41,7 @@ function DetailModal({ emp, year, month, onClose }) {
         {/* Header */}
         <div className="bg-gradient-to-r from-sky-600 to-indigo-600 px-5 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center text-white text-lg font-bold">
-              {emp.employee_name.charAt(0).toUpperCase()}
-            </div>
+            <UserAvatar name={emp.employee_name} profileImage={emp.profile_image} size="md" />
             <div>
               <p className="text-white font-bold">{emp.employee_name}</p>
               <p className="text-white/70 text-xs">{emp.department}</p>
@@ -278,9 +277,7 @@ export default function AdminWFHPage() {
                     <td className="px-4 py-3 text-gray-500 font-medium">{i + 1}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 rounded-full bg-gradient-to-br from-sky-500 to-indigo-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-                          {emp.employee_name.charAt(0).toUpperCase()}
-                        </div>
+                        <UserAvatar name={emp.employee_name} profileImage={emp.profile_image} size="sm" rounded="full" />
                         <span className="font-semibold text-gray-800">{emp.employee_name}</span>
                       </div>
                     </td>
