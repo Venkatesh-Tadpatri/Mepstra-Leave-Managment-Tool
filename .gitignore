@@ -26,6 +26,11 @@ frontend/.env.local
 frontend/.env.*.local
 frontend/coverage/
 
+# Custom files to ignore
+frontend/src/services/api.js
+frontend/vite.config.js
+frontend/src/App.jsx
+
 # ── OS & Editor ───────────────────────────────────────────────
 .DS_Store
 Thumbs.db
