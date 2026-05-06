@@ -67,3 +67,29 @@ def bulk_create_holidays(data: List[HolidayCreate], db: Session = Depends(get_db
         created.append(str(item.date))
     db.commit()
     return {"created": len(created), "skipped": len(skipped), "skipped_dates": skipped}
+
+
+@router.post("/bulk-upsert", status_code=201)
+def bulk_upsert_holidays(data: List[HolidayCreate], db: Session = Depends(get_db), _=Depends(require_admin_or_hr)):
+    created = []
+    updated = []
+
+    for item in data:
+        existing = db.query(Holiday).filter(Holiday.date == item.date).first()
+        if existing:
+            for k, v in item.model_dump().items():
+                setattr(existing, k, v)
+            updated.append(str(item.date))
+            continue
+
+        holiday = Holiday(**item.model_dump())
+        db.add(holiday)
+        created.append(str(item.date))
+
+    db.commit()
+    return {
+        "created": len(created),
+        "updated": len(updated),
+        "created_dates": created,
+        "updated_dates": updated,
+    }

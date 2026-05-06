@@ -106,6 +106,7 @@ export const createHoliday                 = (data) => API.post("/holidays", dat
 export const updateHoliday                 = (id, data) => API.put(`/holidays/${id}`, data);
 export const deleteHoliday                 = (id) => API.delete(`/holidays/${id}`);
 export const bulkCreateHolidays            = (data) => API.post("/holidays/bulk", data);
+export const bulkUpsertHolidays            = (data) => API.post("/holidays/bulk-upsert", data);
 
 // ---- Departments ---------------------------------------------------
 export const DEPARTMENTS_API               = `${BASE_URL}/departments`;
@@ -156,6 +157,7 @@ export const ALLOWED_EMAIL_BY_ID_API       = (id) => `${BASE_URL}/allowed-emails
 
 export const getAllowedEmails              = () => API.get("/allowed-emails");
 export const addAllowedEmail              = (data) => API.post("/allowed-emails", data);
+export const bulkUpsertAllowedEmails      = (data) => API.post("/allowed-emails/bulk-upsert", data);
 export const updateAllowedEmail           = (id, data) => API.patch(`/allowed-emails/${id}`, data);
 export const removeAllowedEmail           = (id) => API.delete(`/allowed-emails/${id}`);
 

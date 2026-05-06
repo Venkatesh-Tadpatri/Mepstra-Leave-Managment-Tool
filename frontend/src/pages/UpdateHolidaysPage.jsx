@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import toast from "react-hot-toast";
 import { bulkCreateHolidays, getHolidays, updateHoliday, deleteHoliday } from "../services/api";
 import { MdAdd, MdDelete, MdCalendarMonth, MdCheckCircle, MdEdit, MdSave, MdClose, MdAutoAwesome, MdWarning } from "react-icons/md";
+import HolidayCalendarUploadButton from "../components/holidays/HolidayCalendarUploadButton";
 
 const DAYS = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
@@ -141,6 +142,13 @@ export default function UpdateHolidaysPage() {
     } catch {}
   }
 
+  function handleCalendarImported(imported) {
+    const importedYear = imported?.[0]?.year || selectedYear;
+    if (importedYear !== selectedYear) setSelectedYear(importedYear);
+    loadYears();
+    loadExisting(importedYear);
+  }
+
   const grouped = {};
   existingHolidays.forEach((h) => {
     const m = new Date(h.date + "T00:00:00").getMonth();
@@ -157,7 +165,7 @@ export default function UpdateHolidaysPage() {
         <div className="absolute -top-6 -right-6 w-36 h-36 rounded-full bg-white/10" />
         <div className="absolute -bottom-8 -left-4 w-44 h-44 rounded-full bg-white/5" />
         <div className="absolute top-4 right-20 w-16 h-16 rounded-full bg-white/10" />
-        <div className="relative z-10 flex items-center justify-between">
+        <div className="relative z-10 flex items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 mb-1">
               <MdAutoAwesome className="text-yellow-300 text-lg" />
@@ -166,8 +174,15 @@ export default function UpdateHolidaysPage() {
             <h1 className="text-2xl font-extrabold">Update Holiday Calendar</h1>
             <p className="text-white/70 text-sm mt-1">Add new holidays or edit existing ones for any year</p>
           </div>
-          <div className="w-14 h-14 rounded-2xl bg-white/20 backdrop-blur flex items-center justify-center shadow-lg">
-            <MdCalendarMonth className="text-white text-3xl" />
+          <div className="flex items-center gap-3">
+            <HolidayCalendarUploadButton
+              year={selectedYear}
+              onImported={handleCalendarImported}
+              className="bg-white/95 text-indigo-700 hover:bg-white shadow-black/10"
+            />
+            <div className="w-14 h-14 rounded-2xl bg-white/20 backdrop-blur flex items-center justify-center shadow-lg">
+              <MdCalendarMonth className="text-white text-3xl" />
+            </div>
           </div>
         </div>
       </div>

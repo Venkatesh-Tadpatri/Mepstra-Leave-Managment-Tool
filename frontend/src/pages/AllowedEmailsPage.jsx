@@ -7,6 +7,7 @@ import {
   MdPerson, MdEdit, MdCheck, MdWarning,
 } from "react-icons/md";
 import { SiGmail } from "react-icons/si";
+import AllowedEmailsUploadButton from "../components/allowedEmails/AllowedEmailsUploadButton";
 
 const fadeUp = { hidden: { opacity: 0, y: 16 }, show: { opacity: 1, y: 0, transition: { duration: 0.3 } } };
 const stagger = { show: { transition: { staggerChildren: 0.06 } } };
@@ -192,13 +193,16 @@ export default function AllowedEmailsPage() {
             Only emails in this list can register. If the list is empty, domain-based validation applies.
           </p>
         </div>
-        <motion.button
-          whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
-          onClick={() => setAdding(true)}
-          className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-600 to-violet-600 text-white rounded-xl font-semibold shadow-lg shadow-blue-500/25 text-sm"
-        >
-          <MdAdd className="text-lg" /> Add Employee
-        </motion.button>
+        <div className="flex items-center gap-3">
+          <AllowedEmailsUploadButton onImported={load} />
+          <motion.button
+            whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
+            onClick={() => setAdding(true)}
+            className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-600 to-violet-600 text-white rounded-xl font-semibold shadow-lg shadow-blue-500/25 text-sm"
+          >
+            <MdAdd className="text-lg" /> Add Employee
+          </motion.button>
+        </div>
       </motion.div>
 
       {/* Info banner */}

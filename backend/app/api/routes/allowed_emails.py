@@ -52,6 +52,67 @@ def add_allowed_email(
     return entry
 
 
+@router.post("/bulk-upsert", status_code=201)
+def bulk_upsert_allowed_emails(
+    data: List[AllowedEmailCreate],
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin_or_hr),
+):
+    """Create or update whitelist employees from an Excel upload."""
+    created = []
+    updated = []
+
+    for item in data:
+        matches = []
+        if item.outlook_email:
+            match = db.query(AllowedEmail).filter(AllowedEmail.outlook_email == item.outlook_email).first()
+            if match:
+                matches.append(match)
+        if item.gmail:
+            match = db.query(AllowedEmail).filter(AllowedEmail.gmail == item.gmail).first()
+            if match and all(existing.id != match.id for existing in matches):
+                matches.append(match)
+
+        if len(matches) > 1:
+            raise HTTPException(
+                400,
+                f"{item.employee_name} has emails that belong to different whitelist rows. Fix the Excel file and try again.",
+            )
+
+        entry = matches[0] if matches else None
+        if entry:
+            entry.employee_name = item.employee_name
+            entry.outlook_email = item.outlook_email
+            entry.gmail = item.gmail
+            entry.notes = item.notes
+            entry.casual_leaves = item.casual_leaves
+            entry.sick_leaves = item.sick_leaves
+            entry.optional_leaves = item.optional_leaves
+            updated.append(item.employee_name)
+            continue
+
+        entry = AllowedEmail(
+            employee_name=item.employee_name,
+            outlook_email=item.outlook_email,
+            gmail=item.gmail,
+            notes=item.notes,
+            casual_leaves=item.casual_leaves,
+            sick_leaves=item.sick_leaves,
+            optional_leaves=item.optional_leaves,
+            added_by_id=current_user.id,
+        )
+        db.add(entry)
+        created.append(item.employee_name)
+
+    db.commit()
+    return {
+        "created": len(created),
+        "updated": len(updated),
+        "created_names": created,
+        "updated_names": updated,
+    }
+
+
 @router.patch("/{entry_id}", response_model=AllowedEmailResponse)
 def update_allowed_email(
     entry_id: int,

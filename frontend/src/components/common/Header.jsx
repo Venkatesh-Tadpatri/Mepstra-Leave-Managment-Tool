@@ -49,8 +49,8 @@ export default function Header() {
           <MdMenu className="text-xl" />
         </motion.button>
 
-        <div className="flex items-center px-2 py-1.5 rounded-xl border border-teal-100 bg-gradient-to-r from-teal-50 to-cyan-50">
-          <img src="/mepstra-logo.png" alt="Mepstra" className="h-11 w-auto object-contain" />
+        <div className="flex items-center">
+          <img src="/mepstra-logo.png" alt="Mepstra" className="h-14 w-auto object-contain" />
         </div>
 
         <div className="hidden md:block h-6 w-px bg-gray-200" />
@@ -62,7 +62,7 @@ export default function Header() {
               👋
             </motion.span>
           </p>
-          <p className="text-xs text-gray-400">{user?.department?.name || "Mepstra"}</p>
+          {/* <p className="text-xs text-gray-400">{user?.department?.name || "Mepstra"}</p> */}
         </div>
       </div>
 
