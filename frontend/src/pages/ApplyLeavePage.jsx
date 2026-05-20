@@ -611,12 +611,29 @@ export default function ApplyLeavePage() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
                     {optionalHolidays.map((h) => {
                       const d = new Date(h.date + "T00:00:00");
+                      const today = new Date(); today.setHours(0, 0, 0, 0);
                       const dayName = d.toLocaleDateString("en-IN", { weekday: "long" });
                       const dateStr = d.toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
                       const isSelected = form.start_date === h.date;
                       const isUsed = usedOptionalDates.has(h.date);
-                      const quotaFull = available <= 0 && !isUsed;
-                      const isDisabled = isUsed || quotaFull;
+                      const isPast = d < today && !isUsed;
+                      const quotaFull = available <= 0 && !isUsed && !isPast;
+                      const isDisabled = isUsed || isPast || quotaFull;
+
+                      const cardClass = isUsed || isPast
+                        ? "border-gray-200 bg-gray-50 opacity-55 cursor-not-allowed"
+                        : quotaFull
+                          ? "border-red-100 bg-red-50/40 opacity-50 cursor-not-allowed"
+                          : isSelected
+                            ? "border-amber-400 bg-amber-50"
+                            : "border-gray-200 bg-white hover:border-amber-300 hover:bg-amber-50/40 cursor-pointer";
+
+                      const calClass = isUsed || isPast || quotaFull
+                        ? "bg-gray-200 text-gray-400"
+                        : isSelected
+                          ? "bg-amber-400 text-white"
+                          : "bg-amber-100 text-amber-700";
+
                       return (
                         <button
                           key={h.id}
@@ -627,27 +644,22 @@ export default function ApplyLeavePage() {
                             setForm((f) => ({ ...f, start_date: h.date, end_date: h.date }));
                             setWorkingDays(form.half_day ? 0.5 : 1);
                           }}
-                          className={`flex items-center gap-3 p-3.5 rounded-xl border-2 text-left transition-all ${
-                            isUsed
-                              ? "border-gray-200 bg-gray-50 opacity-60 cursor-not-allowed"
-                              : quotaFull
-                                ? "border-red-100 bg-red-50/40 opacity-50 cursor-not-allowed"
-                                : isSelected
-                                  ? "border-amber-400 bg-amber-50"
-                                  : "border-gray-200 bg-white hover:border-amber-300 hover:bg-amber-50/40 cursor-pointer"
-                          }`}
+                          className={`flex items-center gap-3 p-3.5 rounded-xl border-2 text-left transition-all ${cardClass}`}
                         >
-                          <div className={`w-12 h-12 rounded-xl flex flex-col items-center justify-center flex-shrink-0 shadow-sm ${
-                            isUsed || quotaFull ? "bg-gray-200 text-gray-400" : isSelected ? "bg-amber-400 text-white" : "bg-amber-100 text-amber-700"
-                          }`}>
+                          <div className={`w-12 h-12 rounded-xl flex flex-col items-center justify-center flex-shrink-0 shadow-sm ${calClass}`}>
                             <span className="text-base font-extrabold leading-none">{d.getDate()}</span>
                             <span className="text-[10px] opacity-80">{d.toLocaleDateString("en-IN", { month: "short" })}</span>
                           </div>
                           <div className="min-w-0">
-                            <p className={`font-semibold text-sm truncate ${isDisabled ? "text-gray-400 line-through" : isSelected ? "text-amber-800" : "text-gray-800"}`}>{h.name}</p>
+                            <p className={`font-semibold text-sm truncate ${isDisabled ? "text-gray-400 line-through" : isSelected ? "text-amber-800" : "text-gray-800"}`}>
+                              {h.name}
+                            </p>
                             <p className="text-xs text-gray-400">{dayName} · {dateStr}</p>
                             {isUsed && (
                               <span className="inline-block mt-1 text-[10px] font-bold px-1.5 py-0.5 rounded bg-gray-300 text-gray-600">Already Used</span>
+                            )}
+                            {isPast && (
+                              <span className="inline-block mt-1 text-[10px] font-bold px-1.5 py-0.5 rounded bg-gray-200 text-gray-500">Date Passed</span>
                             )}
                             {quotaFull && (
                               <span className="inline-block mt-1 text-[10px] font-bold px-1.5 py-0.5 rounded bg-red-200 text-red-600">Quota Full</span>

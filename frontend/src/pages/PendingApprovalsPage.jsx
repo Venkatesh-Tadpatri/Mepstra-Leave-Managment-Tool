@@ -4,7 +4,7 @@ import { fetchPending, fetchPendingWFH } from "../store/slices/leaveSlice";
 import { actionLeave, revokeLeave, getPendingWFH, actionWFH, getLeaves, getMyWFH } from "../services/api";
 import toast from "react-hot-toast";
 import { motion, AnimatePresence } from "framer-motion";
-import { MdCheckCircle, MdCancel, MdCalendarMonth, MdClose, MdHourglassTop, MdDone, MdLaptop, MdUndo } from "react-icons/md";
+import { MdCheckCircle, MdCancel, MdCalendarMonth, MdClose, MdHourglassTop, MdDone, MdLaptop, MdUndo, MdInfoOutline } from "react-icons/md";
 import { format } from "date-fns";
 import UserAvatar from "../components/common/UserAvatar";
 
@@ -38,6 +38,12 @@ function ActionModal({ leave, onClose, onAction }) {
   const [loading, setLoading] = useState(false);
   const lc = LEAVE_TYPE_STYLES[leave.leave_type] || { bg: "bg-gray-100", text: "text-gray-600", dot: "#6b7280" };
 
+  const isWeekendWorkReq = leave.leave_type === "special" &&
+    (leave.reason || "").toLowerCase().startsWith("weekend work request:");
+  const workDate = isWeekendWorkReq ? new Date(leave.start_date) : null;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const approveBlocked = isWeekendWorkReq && workDate && workDate > today;
+
   async function handleAction(action) {
     setLoading(true);
     try {
@@ -50,79 +56,94 @@ function ActionModal({ leave, onClose, onAction }) {
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-3">
       <motion.div initial={{ opacity: 0, scale: 0.9, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.9 }}
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col"
+        style={{ maxHeight: "90vh" }}>
 
         {/* Header */}
-        <div className="bg-gradient-to-r from-slate-800 to-slate-900 p-5 flex items-center justify-between">
+        <div className="bg-gradient-to-r from-slate-800 to-slate-900 px-4 py-3 flex items-center justify-between flex-shrink-0 rounded-t-2xl">
           <div>
-            <h3 className="text-white font-bold text-lg">Review Leave Request</h3>
-            <p className="text-slate-400 text-xs mt-0.5">Approve or reject this request</p>
+            <h3 className="text-white font-bold text-base">Review Leave Request</h3>
+            <p className="text-slate-400 text-xs">Approve or reject this request</p>
           </div>
           <button onClick={onClose}
-            className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition-colors">
-            <MdClose />
+            className="w-7 h-7 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition-colors">
+            <MdClose size={16} />
           </button>
         </div>
 
-        {/* Employee info */}
-        <div className="p-5">
-          <div className="bg-gray-50 rounded-xl p-4 mb-4">
-            <div className="flex items-center gap-3 mb-4">
-              <UserAvatar name={leave.user?.full_name} profileImage={leave.user?.profile_image} size="lg" />
-              <div>
-                <p className="font-semibold text-gray-900">{leave.user?.full_name}</p>
-                <p className="text-xs text-gray-400">{leave.user?.department?.name}</p>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-2.5 text-sm">
-              <div className="bg-white rounded-lg p-2.5">
-                <p className="text-xs text-gray-400 mb-0.5">Leave Type</p>
-                <span className={`px-2 py-0.5 rounded-full text-xs font-semibold capitalize ${lc.bg} ${lc.text}`}>
-                  {getLeaveTypeLabel(leave)}
-                </span>
-              </div>
-              <div className="bg-white rounded-lg p-2.5">
-                <p className="text-xs text-gray-400 mb-0.5">Duration</p>
-                <p className="font-semibold text-gray-800">{leave.total_days} day(s)</p>
-              </div>
-              <div className="bg-white rounded-lg p-2.5">
-                <p className="text-xs text-gray-400 mb-0.5">From</p>
-                <p className="font-semibold text-gray-800">{leave.start_date}</p>
-              </div>
-              <div className="bg-white rounded-lg p-2.5">
-                <p className="text-xs text-gray-400 mb-0.5">To</p>
-                <p className="font-semibold text-gray-800">{leave.end_date}</p>
-              </div>
-            </div>
-            <div className="mt-2.5 bg-white rounded-lg p-2.5">
-              <p className="text-xs text-gray-400 mb-1">Reason</p>
-              <p className="text-sm text-gray-700">{leave.reason}</p>
+        {/* Scrollable content */}
+        <div className="overflow-y-auto flex-1 p-4 space-y-3">
+          {/* Employee row */}
+          <div className="flex items-center gap-2.5">
+            <UserAvatar name={leave.user?.full_name} profileImage={leave.user?.profile_image} size="md" />
+            <div>
+              <p className="font-semibold text-gray-900 text-sm">{leave.user?.full_name}</p>
+              <p className="text-xs text-gray-400">{leave.user?.department?.name}</p>
             </div>
           </div>
 
+          {/* Info grid */}
+          <div className="grid grid-cols-2 gap-2 text-sm">
+            <div className="bg-gray-50 rounded-lg p-2">
+              <p className="text-xs text-gray-400 mb-0.5">Leave Type</p>
+              <span className={`px-2 py-0.5 rounded-full text-xs font-semibold capitalize ${lc.bg} ${lc.text}`}>
+                {getLeaveTypeLabel(leave)}
+              </span>
+            </div>
+            <div className="bg-gray-50 rounded-lg p-2">
+              <p className="text-xs text-gray-400 mb-0.5">Duration</p>
+              <p className="font-semibold text-gray-800 text-xs">{leave.total_days} day(s)</p>
+            </div>
+            <div className="bg-gray-50 rounded-lg p-2">
+              <p className="text-xs text-gray-400 mb-0.5">From</p>
+              <p className="font-semibold text-gray-800 text-xs">{leave.start_date}</p>
+            </div>
+            <div className="bg-gray-50 rounded-lg p-2">
+              <p className="text-xs text-gray-400 mb-0.5">To</p>
+              <p className="font-semibold text-gray-800 text-xs">{leave.end_date}</p>
+            </div>
+          </div>
+
+          {leave.reason && (
+            <div className="bg-gray-50 rounded-lg p-2">
+              <p className="text-xs text-gray-400 mb-0.5">Reason</p>
+              <p className="text-xs text-gray-700">{leave.reason}</p>
+            </div>
+          )}
+
+          {approveBlocked && (
+            <div className="flex items-start gap-2 p-2.5 bg-amber-50 border border-amber-200 rounded-xl">
+              <MdInfoOutline className="text-amber-500 text-base flex-shrink-0 mt-0.5" />
+              <p className="text-xs text-amber-700">
+                Can only be approved <strong>on or after {leave.start_date}</strong> — once the employee has actually worked that day.
+              </p>
+            </div>
+          )}
+
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1.5">Comment <span className="text-gray-400 font-normal">(optional)</span></label>
+            <label className="block text-xs font-semibold text-gray-700 mb-1">Comment <span className="text-gray-400 font-normal">(optional)</span></label>
             <textarea value={comment} onChange={(e) => setComment(e.target.value)}
-              rows={3} placeholder="Add feedback for the employee..."
-              className="input-field resize-none text-sm" />
+              rows={2} placeholder="Add feedback for the employee..."
+              className="input-field resize-none text-xs" />
           </div>
         </div>
 
-        {/* Actions */}
-        <div className="px-5 pb-5 flex gap-3">
-          <button onClick={onClose} className="btn-secondary flex-1 py-2.5">Cancel</button>
+        {/* Sticky action buttons */}
+        <div className="px-4 py-3 flex gap-2 border-t border-gray-100 flex-shrink-0 rounded-b-2xl bg-white">
+          <button onClick={onClose} className="btn-secondary flex-1 py-2 text-sm">Cancel</button>
           <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
             onClick={() => handleAction("reject")} disabled={loading}
-            className="flex-1 py-2.5 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-xl font-semibold flex items-center justify-center gap-2 shadow-md shadow-red-500/20 disabled:opacity-50">
-            <MdCancel /> Reject
+            className="flex-1 py-2 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-xl text-sm font-semibold flex items-center justify-center gap-1.5 shadow-md shadow-red-500/20 disabled:opacity-50">
+            <MdCancel size={16} /> Reject
           </motion.button>
           <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
-            onClick={() => handleAction("approve")} disabled={loading}
-            className="flex-1 py-2.5 bg-gradient-to-r from-emerald-500 to-green-600 text-white rounded-xl font-semibold flex items-center justify-center gap-2 shadow-md shadow-green-500/20 disabled:opacity-50">
-            <MdCheckCircle /> Approve
+            onClick={() => handleAction("approve")} disabled={loading || approveBlocked}
+            title={approveBlocked ? `Can only approve on or after ${leave.start_date}` : ""}
+            className="flex-1 py-2 bg-gradient-to-r from-emerald-500 to-green-600 text-white rounded-xl text-sm font-semibold flex items-center justify-center gap-1.5 shadow-md shadow-green-500/20 disabled:opacity-40 disabled:cursor-not-allowed">
+            <MdCheckCircle size={16} /> Approve
           </motion.button>
         </div>
       </motion.div>
@@ -373,7 +394,13 @@ export default function PendingApprovalsPage() {
   function loadApprovedLeaves() {
     setApprovedLoading(true);
     getLeaves({ status: "approved", team: true })
-      .then((r) => setApprovedLeaves(r.data))
+      .then((r) => {
+        const cutoff = new Date();
+        cutoff.setDate(cutoff.getDate() - 30);
+        cutoff.setHours(0, 0, 0, 0);
+        const recent = (r.data || []).filter((l) => new Date(l.start_date) >= cutoff);
+        setApprovedLeaves(recent);
+      })
       .catch(() => {})
       .finally(() => setApprovedLoading(false));
   }
@@ -685,7 +712,7 @@ export default function PendingApprovalsPage() {
             <div className="flex items-center gap-2 p-3 bg-orange-50 border border-orange-100 rounded-xl">
               <MdUndo className="text-orange-500 flex-shrink-0" />
               <p className="text-sm text-orange-700">
-                Revoking a leave will <strong>restore the employee's balance</strong> and notify them by email.
+                Showing approved leaves from the <strong>last 30 days</strong>. Revoking will <strong>restore the employee's balance</strong> and notify them by email.
               </p>
             </div>
             {approvedLeaves.map((leave) => {

@@ -5,14 +5,19 @@ from datetime import date
 from calendar import monthrange
 from app.db.database import get_db
 from app.api.deps import get_current_user
-from app.models.models import User, LeaveRequest, LeaveBalance, LeaveStatus, Department, UserRole
+from app.models.models import User, LeaveRequest, LeaveBalance, LeaveStatus, Department, UserRole, BusinessUnit
+from typing import Optional
 from app.schemas.schemas import DashboardStats
 
 router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 
 
 @router.get("/stats")
-def get_stats(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def get_stats(
+    business_unit: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     today = date.today()
     is_manager_view = current_user.role in [UserRole.MANAGER, UserRole.TEAM_LEAD]
 
@@ -21,20 +26,18 @@ def get_stats(db: Session = Depends(get_db), current_user: User = Depends(get_cu
         managed_users_q = managed_users_q.filter(User.manager_id == current_user.id)
     elif current_user.role == UserRole.TEAM_LEAD:
         managed_users_q = managed_users_q.filter(User.team_lead_id == current_user.id)
+    if business_unit:
+        managed_users_q = managed_users_q.filter(User.business_unit == business_unit)
 
     managed_user_ids = [u.id for u in managed_users_q.all()]
 
     if is_manager_view:
         total_employees = len(managed_user_ids)
-        pending_requests = (
-            db.query(LeaveRequest)
-            .join(User, LeaveRequest.user_id == User.id)
-            .filter(
-                User.manager_id == current_user.id,
-                LeaveRequest.status == LeaveStatus.PENDING
-            )
-            .count()
-        )
+        pq = (db.query(LeaveRequest).join(User, LeaveRequest.user_id == User.id)
+              .filter(User.manager_id == current_user.id, LeaveRequest.status == LeaveStatus.PENDING))
+        if business_unit:
+            pq = pq.filter(User.business_unit == business_unit)
+        pending_requests = pq.count()
         on_leave_today = db.query(LeaveRequest).filter(
             LeaveRequest.user_id.in_(managed_user_ids),
             LeaveRequest.start_date <= today,
@@ -44,22 +47,29 @@ def get_stats(db: Session = Depends(get_db), current_user: User = Depends(get_cu
         approved_today = db.query(LeaveRequest).filter(
             LeaveRequest.user_id.in_(managed_user_ids),
             func.date(LeaveRequest.manager_action_at) == today,
-            or_(
-                LeaveRequest.status == LeaveStatus.APPROVED,
-                LeaveRequest.status == LeaveStatus.APPROVED_BY_MANAGER,
-            )
+            or_(LeaveRequest.status == LeaveStatus.APPROVED,
+                LeaveRequest.status == LeaveStatus.APPROVED_BY_MANAGER)
         ).count()
     else:
-        total_employees = db.query(User).filter(User.is_active == True).count()
-        pending_requests = db.query(LeaveRequest).filter(
-            LeaveRequest.status == LeaveStatus.PENDING
-        ).count()
+        all_users_q = db.query(User).filter(User.is_active == True)
+        if business_unit:
+            all_users_q = all_users_q.filter(User.business_unit == business_unit)
+        all_user_ids = [u.id for u in all_users_q.all()]
+
+        total_employees = len(all_user_ids)
+        pending_requests = (db.query(LeaveRequest)
+            .join(User, LeaveRequest.user_id == User.id)
+            .filter(LeaveRequest.status == LeaveStatus.PENDING,
+                    LeaveRequest.user_id.in_(all_user_ids))
+            .count())
         on_leave_today = db.query(LeaveRequest).filter(
+            LeaveRequest.user_id.in_(all_user_ids),
             LeaveRequest.start_date <= today,
             LeaveRequest.end_date >= today,
             LeaveRequest.status == LeaveStatus.APPROVED
         ).count()
         approved_today = db.query(LeaveRequest).filter(
+            LeaveRequest.user_id.in_(all_user_ids),
             func.date(LeaveRequest.main_manager_action_at) == today,
             LeaveRequest.status == LeaveStatus.APPROVED
         ).count()
@@ -122,7 +132,11 @@ def get_stats(db: Session = Depends(get_db), current_user: User = Depends(get_cu
 
 
 @router.get("/on-leave-today")
-def on_leave_today(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def on_leave_today(
+    business_unit: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     today = date.today()
     is_manager_view = current_user.role in [UserRole.MANAGER, UserRole.TEAM_LEAD]
 
@@ -136,6 +150,8 @@ def on_leave_today(db: Session = Depends(get_db), current_user: User = Depends(g
             LeaveRequest.status == LeaveStatus.APPROVED,
         )
     )
+    if business_unit:
+        q = q.filter(User.business_unit == business_unit)
     if is_manager_view:
         managed_user_ids = [
             u.id for u in db.query(User).filter(
@@ -153,6 +169,7 @@ def on_leave_today(db: Session = Depends(get_db), current_user: User = Depends(g
             "employee_name": user.full_name,
             "profile_image": user.profile_image,
             "department": dept.name if dept else None,
+            "business_unit": user.business_unit.value if user.business_unit else None,
             "leave_type": leave.leave_type.value,
             "start_date": str(leave.start_date),
             "end_date": str(leave.end_date),
@@ -168,6 +185,7 @@ def leave_schedule(
     year: int = Query(None),
     day: int = Query(None),
     department_id: int = Query(None),
+    business_unit: Optional[str] = Query(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -200,6 +218,8 @@ def leave_schedule(
 
     if department_id:
         q = q.filter(User.department_id == department_id)
+    if business_unit:
+        q = q.filter(User.business_unit == business_unit)
 
     if is_manager_view:
         managed_ids = [

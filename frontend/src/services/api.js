@@ -74,6 +74,8 @@ export const enableEmergencyOverrideToday  = (userId) => API.post(`/users/${user
 export const disableEmergencyOverrideToday = (userId) => API.delete(`/users/${userId}/emergency-override-today`);
 export const resetUserPassword             = (userId, newPassword) =>
   API.post(`/users/${userId}/reset-password`, { new_password: newPassword });
+export const getAnniversaries              = () => API.get("/users/anniversaries");
+export const getEmployeeDirectory          = () => API.get("/users/directory");
 
 // ---- Leaves --------------------------------------------------------
 export const LEAVES_API                    = `${BASE_URL}/leaves`;
@@ -95,6 +97,7 @@ export const cancelLeave                   = (id) => API.delete(`/leaves/${id}`)
 export const getMyBalance                  = (year) => API.get("/leaves/balance", { params: { year } });
 export const getMySpecialCredits           = (year) => API.get("/leaves/special-credits", { params: { year } });
 export const getUserBalance                = (userId, year) => API.get(`/leaves/balance/${userId}`, { params: { year } });
+export const getLeaveReport               = (year) => API.get("/leaves/report", { params: { year } });
 
 // ---- Holidays ------------------------------------------------------
 export const HOLIDAYS_API                  = `${BASE_URL}/holidays`;
@@ -124,12 +127,12 @@ export const ON_LEAVE_TODAY_API            = `${BASE_URL}/dashboard/on-leave-tod
 export const LEAVE_SCHEDULE_API            = `${BASE_URL}/dashboard/leave-schedule`;
 export const EMPLOYEE_LEAVE_REPORT_API     = `${BASE_URL}/dashboard/employee-leave-report`;
 
-export const getDashboardStats             = () => API.get("/dashboard/stats");
+export const getDashboardStats             = (business_unit) => API.get("/dashboard/stats", { params: { business_unit: business_unit || undefined } });
 export const getMyStats                    = () => API.get("/dashboard/my-stats");
-export const getOnLeaveToday               = () => API.get("/dashboard/on-leave-today");
-export const getLeaveSchedule              = (month, year, day, department_id) =>
+export const getOnLeaveToday               = (business_unit) => API.get("/dashboard/on-leave-today", { params: { business_unit: business_unit || undefined } });
+export const getLeaveSchedule              = (month, year, day, department_id, business_unit) =>
   API.get("/dashboard/leave-schedule", {
-    params: { month, year, day: day || undefined, department_id: department_id || undefined },
+    params: { month, year, day: day || undefined, department_id: department_id || undefined, business_unit: business_unit || undefined },
   });
 export const getEmployeeLeaveReport        = (year) => API.get("/dashboard/employee-leave-report", { params: { year } });
 

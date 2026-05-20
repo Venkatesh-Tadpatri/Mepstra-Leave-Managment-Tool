@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useSelector } from "react-redux";
 import { motion, AnimatePresence } from "framer-motion";
 import { format, parseISO } from "date-fns";
 import { getWFHReport } from "../services/api";
@@ -102,7 +103,12 @@ function DetailModal({ emp, year, month, onClose }) {
   );
 }
 
+const TEAM_ROLES = ["manager", "team_lead"];
+
 export default function AdminWFHPage() {
+  const { user } = useSelector((s) => s.auth);
+  const isTeamScope = TEAM_ROLES.includes(user?.role || "");
+
   const currentYear = new Date().getFullYear();
   const currentMonth = new Date().getMonth() + 1;
   const [year, setYear] = useState(currentYear);
@@ -110,6 +116,7 @@ export default function AdminWFHPage() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [buFilter, setBuFilter] = useState("");
   const [selected, setSelected] = useState(null);
 
   const load = (y) => {
@@ -122,8 +129,34 @@ export default function AdminWFHPage() {
 
   useEffect(() => { load(year); }, [year]);
 
-  // Filter employees by selected month — sum actual days, not count requests
-  const employees = (data?.employees || []).map((emp) => {
+  // Step 1: apply BU filter to full list (no month filter yet)
+  const buFiltered = (data?.employees || []).filter((e) =>
+    buFilter ? e.business_unit === buFilter : true
+  );
+
+  // Step 2: compute monthly breakdown from BU-filtered employees
+  const filteredMonthly = Array.from({ length: 12 }, (_, i) => {
+    const m = i + 1;
+    const count = buFiltered.reduce((sum, emp) => {
+      const monthDates = emp.dates.filter((d) => {
+        try { return parseISO(d.date).getMonth() + 1 === m; }
+        catch { return false; }
+      });
+      return sum + monthDates.reduce((s, d) => s + (d.days || 1), 0);
+    }, 0);
+    return { month: m, count };
+  });
+
+  // Step 3: compute cards from BU-filtered data
+  const filteredYearTotal = buFiltered.reduce((s, e) => s + e.count, 0);
+  const filteredThisMonth = filteredMonthly[currentMonth - 1]?.count ?? 0;
+  const filteredPeakMonth = filteredMonthly.some((m) => m.count > 0)
+    ? MONTHS[filteredMonthly.reduce((a, b) => (b.count > a.count ? b : a)).month - 1]
+    : "—";
+  const maxMonth = Math.max(...filteredMonthly.map((m) => m.count), 1);
+
+  // Step 4: apply month filter for table
+  const employees = buFiltered.map((emp) => {
     if (month === 0) return emp;
     const filtered = emp.dates.filter((d) => {
       try { return parseISO(d.date).getMonth() + 1 === month; }
@@ -133,13 +166,13 @@ export default function AdminWFHPage() {
     return { ...emp, dates: filtered, count: filteredDays };
   }).filter((emp) => emp.count > 0);
 
+  // Step 5: apply search for table
   const filteredEmployees = employees.filter((e) =>
     e.employee_name.toLowerCase().includes(search.toLowerCase()) ||
     e.department.toLowerCase().includes(search.toLowerCase())
   );
 
-  const displayTotal = filteredEmployees.reduce((s, e) => s + e.count, 0);
-  const maxMonth = data ? Math.max(...data.monthly.map((m) => m.count), 1) : 1;
+  const displayTotal = month === 0 ? filteredYearTotal : filteredEmployees.reduce((s, e) => s + e.count, 0);
 
   const yearOptions = [];
   for (let y = currentYear; y >= currentYear - 3; y--) yearOptions.push(y);
@@ -152,7 +185,18 @@ export default function AdminWFHPage() {
           <h1 className="text-2xl font-extrabold text-gray-900">WFH Report</h1>
           <p className="text-gray-400 text-sm mt-0.5">Work from home overview across all employees</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {!isTeamScope && (
+            <select
+              value={buFilter}
+              onChange={(e) => setBuFilter(e.target.value)}
+              className="px-3 py-2 border border-gray-200 rounded-xl text-sm font-semibold text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-sky-300"
+            >
+              <option value="">All Business Units</option>
+              <option value="mepstra_power_solutions">MEPstra Power Solutions</option>
+              <option value="mepstra_engineering_consultancy">MEPstra Engineering Consultancy</option>
+            </select>
+          )}
           <select
             value={month}
             onChange={(e) => setMonth(Number(e.target.value))}
@@ -174,10 +218,10 @@ export default function AdminWFHPage() {
       {/* Summary cards */}
       <motion.div variants={stagger} className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { icon: MdHomeWork,      label: month === 0 ? "Total WFH (Year)" : `Total WFH (${MONTHS[month-1]})`, value: displayTotal || data?.total && month === 0 ? (month === 0 ? (data?.total ?? "—") : displayTotal) : (loading ? "—" : displayTotal), gradient: "linear-gradient(135deg,#4facfe,#00f2fe)" },
-          { icon: MdPeople,        label: "Employees Used WFH", value: filteredEmployees.length || (loading ? "—" : 0),  gradient: "linear-gradient(135deg,#667eea,#764ba2)" },
-          { icon: MdCalendarMonth, label: "This Month",          value: data?.monthly?.[currentMonth - 1]?.count ?? "—", gradient: "linear-gradient(135deg,#f093fb,#f5576c)" },
-          { icon: MdBarChart,      label: "Peak Month",          value: data ? MONTHS[data.monthly.reduce((a,b)=>b.count>a.count?b:a,data.monthly[0]).month-1] : "—", gradient: "linear-gradient(135deg,#43e97b,#38f9d7)" },
+          { icon: MdHomeWork,      label: month === 0 ? "Total WFH (Year)" : `Total WFH (${MONTHS[month-1]})`, value: loading ? "—" : displayTotal,       gradient: "linear-gradient(135deg,#4facfe,#00f2fe)" },
+          { icon: MdPeople,        label: "Employees Used WFH", value: loading ? "—" : (month === 0 ? buFiltered.length : filteredEmployees.length), gradient: "linear-gradient(135deg,#667eea,#764ba2)" },
+          { icon: MdCalendarMonth, label: "This Month",          value: loading ? "—" : filteredThisMonth, gradient: "linear-gradient(135deg,#f093fb,#f5576c)" },
+          { icon: MdBarChart,      label: "Peak Month",          value: loading ? "—" : filteredPeakMonth, gradient: "linear-gradient(135deg,#43e97b,#38f9d7)" },
         ].map(({ icon: Icon, label, value, gradient }) => (
           <motion.div key={label} variants={fadeUp}
             className="relative overflow-hidden rounded-2xl p-5 shadow-lg"
@@ -203,7 +247,7 @@ export default function AdminWFHPage() {
           <div className="h-32 flex items-center justify-center text-gray-400 text-sm">Loading…</div>
         ) : (
           <div className="flex items-end gap-2 h-36">
-            {(data?.monthly || []).map((m) => {
+            {filteredMonthly.map((m) => {
               const pct = maxMonth > 0 ? (m.count / maxMonth) * 100 : 0;
               const isActive = month === 0 || month === m.month;
               return (

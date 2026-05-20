@@ -36,6 +36,7 @@ export default function EmployeesPage() {
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("");
   const [deptFilter, setDeptFilter] = useState("");
+  const [buFilter, setBuFilter] = useState("");
   const [editing, setEditing] = useState(null);
   const [loading, setLoading] = useState(false);
   const [overrideUserIds, setOverrideUserIds] = useState(new Set()); // user_ids with override ON today
@@ -46,6 +47,8 @@ export default function EmployeesPage() {
   const [togglingActiveId, setTogglingActiveId] = useState(null);
   const [confirmDialog, setConfirmDialog] = useState(null); // { user, action: "deactivate"|"activate" }
   const isAdmin = currentUser?.role === "admin";
+  const isManager = currentUser?.role === "manager" || currentUser?.role === "team_lead";
+  const showBUFilter = !isManager;
   const canToggleEmployeeOverride = ["manager", "team_lead"].includes(currentUser?.role);
   const canToggleManagerOverride = ["admin", "main_manager"].includes(currentUser?.role);
   const departmentFromQuery = searchParams.get("department") || "";
@@ -78,7 +81,8 @@ export default function EmployeesPage() {
       u.email.toLowerCase().includes(search.toLowerCase());
     const matchRole = !roleFilter || u.role === roleFilter;
     const matchDept = !deptFilter || u.department_id === parseInt(deptFilter);
-    return matchSearch && matchRole && matchDept;
+    const matchBU = !buFilter || u.business_unit === buFilter;
+    return matchSearch && matchRole && matchDept && matchBU;
   });
 
   async function handleUpdate(e) {
@@ -186,22 +190,35 @@ export default function EmployeesPage() {
             placeholder="Search by name or email..."
             className="input-field pl-9 text-sm" />
         </div>
-        <select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)} className="input-field w-40 text-sm">
-          <option value="">All Roles</option>
-          <option value="employee">Employee</option>
-          <option value="team_lead">Team Lead</option>
-          <option value="manager">Manager</option>
-          <option value="hr">HR</option>
-          <option value="main_manager">Main Manager</option>
-        </select>
-        <select value={deptFilter} onChange={(e) => setDeptFilter(e.target.value)} className="input-field w-44 text-sm">
-          <option value="">All Departments</option>
-          {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-        </select>
+        {showBUFilter && (
+          <select value={buFilter} onChange={(e) => { setBuFilter(e.target.value); setDeptFilter(""); }} className="input-field w-52 text-sm">
+            <option value="">All Business Units</option>
+            <option value="mepstra_power_solutions">MEPstra Power Solutions</option>
+            <option value="mepstra_engineering_consultancy">MEPstra Engineering Consultancy</option>
+          </select>
+        )}
+        {!isManager && (
+          <select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)} className="input-field w-40 text-sm">
+            <option value="">All Roles</option>
+            <option value="employee">Employee</option>
+            <option value="team_lead">Team Lead</option>
+            <option value="manager">Manager</option>
+            <option value="hr">HR</option>
+            <option value="main_manager">Main Manager</option>
+          </select>
+        )}
+        {!isManager && (
+          <select value={deptFilter} onChange={(e) => setDeptFilter(e.target.value)} className="input-field w-44 text-sm">
+            <option value="">All Departments</option>
+            {departments
+              .filter((d) => !buFilter || d.business_unit === buFilter)
+              .map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+          </select>
+        )}
         <AnimatePresence>
-          {(search || roleFilter || deptFilter) && (
+          {(search || roleFilter || deptFilter || buFilter) && (
             <motion.button initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }}
-              onClick={() => { setSearch(""); setRoleFilter(""); setDeptFilter(""); }}
+              onClick={() => { setSearch(""); setRoleFilter(""); setDeptFilter(""); setBuFilter(""); }}
               className="flex items-center gap-1 text-sm text-gray-400 hover:text-gray-600 bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-lg transition-colors">
               <MdClose className="text-sm" /> Clear
             </motion.button>

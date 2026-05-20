@@ -169,6 +169,7 @@ def wfh_today(
             "id": r.id,
             "employee_name": r.user.full_name if r.user else "—",
             "department": r.user.department.name if r.user and r.user.department else None,
+            "business_unit": r.user.business_unit.value if r.user and r.user.business_unit else None,
             "start_date": str(r.start_date),
             "end_date": str(r.end_date),
             "total_days": r.total_days,
@@ -291,6 +292,7 @@ def wfh_report(
                 "employee_name": r.user.full_name if r.user else "—",
                 "profile_image": r.user.profile_image if r.user else None,
                 "department": r.user.department.name if r.user and r.user.department else "—",
+                "business_unit": r.user.business_unit.value if r.user and r.user.business_unit else None,
                 "count": 0.0,
                 "dates": [],
             }

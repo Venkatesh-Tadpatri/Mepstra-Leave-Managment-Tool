@@ -207,20 +207,22 @@ export default function DashboardPage() {
   const showScheduleSection = isStrictAdmin || isManager || isHR;
   const showDeptFilter = isStrictAdmin || isHR;
   const canExportReport = ["admin", "hr"].includes(user?.role);
+  const showBUFilter = ["admin", "main_manager", "hr"].includes(user?.role);
+  const [buFilter, setBuFilter] = useState("");
 
   useEffect(() => {
-    if (isAdmin) getDashboardStats().then((r) => setStats(r.data)).catch(() => {});
     if (!isStrictAdmin) getMyStats().then((r) => setMyStats(r.data)).catch(() => {});
+    if (showDeptFilter) getDepartments().then((r) => setDepartments(r.data)).catch(() => {});
+  }, [isStrictAdmin, showDeptFilter]);
+
+  useEffect(() => {
+    setScheduleDept(0); // reset dept filter when BU changes
+    if (isAdmin) getDashboardStats(buFilter).then((r) => setStats(r.data)).catch(() => {});
     if (showScheduleSection) {
-      getOnLeaveToday().then((r) => setTodayOnLeave(r.data)).catch(() => {});
+      getOnLeaveToday(buFilter).then((r) => setTodayOnLeave(r.data)).catch(() => {});
       getWFHToday().then((r) => setTodayWFH(r.data)).catch(() => {});
-      getLeaveSchedule(new Date().getMonth() + 1, new Date().getFullYear(), null, 0)
-        .then((r) => setSchedule(r.data)).catch(() => {});
     }
-    if (showDeptFilter) {
-      getDepartments().then((r) => setDepartments(r.data)).catch(() => {});
-    }
-  }, [isAdmin, isStrictAdmin, isManager, isHR, showScheduleSection, showDeptFilter]);
+  }, [isAdmin, showScheduleSection, buFilter]);
 
   useEffect(() => {
     if (!showScheduleSection) return;
@@ -232,9 +234,9 @@ export default function DashboardPage() {
       y = picked.getFullYear();
       d = picked.getDate();
     }
-    getLeaveSchedule(m, y, d, scheduleDept)
+    getLeaveSchedule(m, y, d, scheduleDept, buFilter)
       .then((r) => setSchedule(r.data)).catch(() => {});
-  }, [scheduleMonth, scheduleYear, scheduleDay, scheduleDept, showScheduleSection]);
+  }, [scheduleMonth, scheduleYear, scheduleDay, scheduleDept, buFilter, showScheduleSection]);
 
   useEffect(() => {
     if (!showLeaveTable) return;
@@ -510,6 +512,12 @@ export default function DashboardPage() {
     }
   }
 
+  // Backend now filters by BU — use lists directly
+  const filteredOnLeave = todayOnLeave;
+  const filteredWFH = buFilter
+    ? todayWFH.filter((e) => e.business_unit === buFilter)
+    : todayWFH;
+
   const pieData = myStats ? [
     { name: "Approved", value: myStats.approved || 0, color: "#10b981" },
     { name: "Pending",  value: myStats.pending  || 0, color: "#f59e0b" },
@@ -533,6 +541,17 @@ export default function DashboardPage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {showBUFilter && (
+            <select
+              value={buFilter}
+              onChange={(e) => setBuFilter(e.target.value)}
+              className="px-3 py-2 border border-gray-200 rounded-xl text-sm font-semibold text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-300"
+            >
+              <option value="">All Business Units</option>
+              <option value="mepstra_power_solutions">MEPstra Power Solutions</option>
+              <option value="mepstra_engineering_consultancy">MEPstra Engineering Consultancy</option>
+            </select>
+          )}
           {canExportReport && (
             <>
               <button
@@ -568,7 +587,7 @@ export default function DashboardPage() {
         <motion.div variants={stagger} className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard icon={MdPeople}        label="Total Employees"  value={stats.total_employees}  gradient="linear-gradient(135deg,#667eea,#764ba2)" onClick={() => navigate("/employees")} />
           <StatCard icon={MdPendingActions} label="Pending Requests" value={stats.pending_requests} gradient="linear-gradient(135deg,#f093fb,#f5576c)" onClick={() => navigate("/approvals")} />
-          <StatCard icon={MdLaptop}         label="WFH Today"        value={todayWFH.length}        gradient="linear-gradient(135deg,#4facfe,#00f2fe)" />
+          <StatCard icon={MdLaptop}         label="WFH Today"        value={filteredWFH.length}     gradient="linear-gradient(135deg,#4facfe,#00f2fe)" />
           <StatCard icon={MdPersonOff}     label="On Leave Today"   value={stats.on_leave_today}   gradient="linear-gradient(135deg,#43e97b,#38f9d7)" onClick={handleOnLeaveTodayClick} />
         </motion.div>
       )}
@@ -581,7 +600,7 @@ export default function DashboardPage() {
               <MdPersonOff className="text-emerald-500 text-xl" />
               <h3 className="font-bold text-gray-900">On Leave Today</h3>
               <span className="ml-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
-                {todayOnLeave.length}
+                {filteredOnLeave.length}
               </span>
             </div>
             <span className="text-xs text-gray-400">
@@ -589,10 +608,10 @@ export default function DashboardPage() {
             </span>
           </div>
 
-          {todayOnLeave.length === 0 ? (
+          {filteredOnLeave.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-10 text-gray-300">
               <MdBeachAccess className="text-4xl mb-2" />
-              <p className="text-sm">No employees on leave today</p>
+              <p className="text-sm">No employees on leave today{buFilter ? " for this business unit" : ""}</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -605,7 +624,7 @@ export default function DashboardPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {todayOnLeave.map((e, i) => (
+                  {filteredOnLeave.map((e, i) => (
                     <tr key={e.id} className={`border-b border-gray-100 transition-colors ${i % 2 === 0 ? "bg-white hover:bg-blue-50/30" : "bg-slate-50/60 hover:bg-blue-50/40"}`}>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
@@ -637,7 +656,7 @@ export default function DashboardPage() {
               <MdLaptop className="text-blue-500 text-xl" />
               <h3 className="font-bold text-gray-900">Work From Home Today</h3>
               <span className="ml-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
-                {todayWFH.length}
+                {filteredWFH.length}
               </span>
             </div>
             <span className="text-xs text-gray-400">
@@ -645,10 +664,10 @@ export default function DashboardPage() {
             </span>
           </div>
 
-          {todayWFH.length === 0 ? (
+          {filteredWFH.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-10 text-gray-300">
               <MdLaptop className="text-4xl mb-2" />
-              <p className="text-sm">No employees working from home today</p>
+              <p className="text-sm">No employees working from home today{buFilter ? " for this business unit" : ""}</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -661,7 +680,7 @@ export default function DashboardPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {todayWFH.map((e, i) => (
+                  {filteredWFH.map((e, i) => (
                     <tr key={e.id} className={`border-b border-gray-100 transition-colors ${i % 2 === 0 ? "bg-white hover:bg-blue-50/30" : "bg-slate-50/60 hover:bg-blue-50/40"}`}>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
@@ -698,10 +717,12 @@ export default function DashboardPage() {
                 <select
                   value={scheduleDept}
                   onChange={(e) => setScheduleDept(Number(e.target.value))}
-                  className="input-field text-sm flex-1 min-w-[8rem] sm:flex-none sm:w-40"
+                  className="input-field text-sm flex-1 min-w-[8rem] sm:flex-none sm:w-56"
                 >
                   <option value={0}>All Departments</option>
-                  {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+                  {departments
+                    .filter((d) => !buFilter || d.business_unit === buFilter)
+                    .map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
                 </select>
               )}
               <div className="flex items-center gap-1">

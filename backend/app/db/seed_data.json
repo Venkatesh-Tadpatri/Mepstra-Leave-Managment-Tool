@@ -32,6 +32,11 @@
     },
     {
       "business_unit": "MEPSTRA_ENGINEERING_CONSULTANCY",
+      "name": "Automation Department",
+      "description": "Industrial Automation Department"
+    },
+    {
+      "business_unit": "MEPSTRA_ENGINEERING_CONSULTANCY",
       "name": "Software Engineer",
       "description": "Software department"
     },
@@ -72,7 +77,6 @@
       "manager": null,
       "hr": null
     }
-    
   ],
 
   "holidays": []

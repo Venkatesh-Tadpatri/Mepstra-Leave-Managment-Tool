@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   MdDashboard, MdEventNote, MdAddCircleOutline, MdPendingActions,
   MdCalendarMonth, MdHolidayVillage, MdPeople, MdAccountBalance, MdPerson,
-  MdEditCalendar, MdShield, MdHomeWork
+  MdEditCalendar, MdShield, MdHomeWork, MdAssessment, MdCelebration
 } from "react-icons/md";
 
 const navItems = [
@@ -19,6 +19,8 @@ const navItems = [
   { to: "/employees",       icon: MdPeople,            label: "Employees",       roles: ["admin","main_manager","manager","hr"],                         color: "from-teal-500 to-cyan-400",     end: true },
   { to: "/departments",     icon: MdAccountBalance,    label: "Departments",     roles: ["admin","main_manager"],                                        color: "from-red-500 to-pink-400",      end: true },
   { to: "/admin-wfh",       icon: MdHomeWork,          label: "WFH Report",      roles: ["admin","main_manager","hr","manager","team_lead"],            color: "from-sky-500 to-cyan-400",      end: true },
+  { to: "/admin-leaves",    icon: MdAssessment,        label: "Leave Report",    roles: ["admin","main_manager","hr","manager","team_lead"],            color: "from-emerald-500 to-teal-400",  end: true },
+  { to: "/anniversaries",   icon: MdCelebration,       label: "Anniversaries",   roles: ["hr"],                                                      color: "from-rose-500 to-pink-400",     end: true },
   { to: "/allowed-emails",  icon: MdShield,            label: "Email Whitelist", roles: ["admin", "hr"],                                                color: "from-emerald-500 to-green-400", end: true },
   { to: "/profile",         icon: MdPerson,            label: "Profile",         roles: ["all"],                                                        color: "from-slate-500 to-gray-400",    end: true },
 ];

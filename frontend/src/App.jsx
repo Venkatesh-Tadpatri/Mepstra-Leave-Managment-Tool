@@ -19,6 +19,8 @@ import DepartmentsPage from "./pages/DepartmentsPage";
 import AllowedEmailsPage from "./pages/AllowedEmailsPage";
 import WFHPage from "./pages/WFHPage";
 import AdminWFHPage from "./pages/AdminWFHPage";
+import AdminLeavePage from "./pages/AdminLeavePage";
+import AnniversariesPage from "./pages/AnniversariesPage";
 
 function PrivateRoute({ children }) {
   const { isAuthenticated, token } = useSelector((s) => s.auth);
@@ -60,6 +62,8 @@ export default function App() {
           <Route path="allowed-emails" element={<AllowedEmailsPage />} />
           <Route path="wfh" element={<WFHPage />} />
           <Route path="admin-wfh" element={<AdminWFHPage />} />
+          <Route path="admin-leaves" element={<AdminLeavePage />} />
+          <Route path="anniversaries" element={<AnniversariesPage />} />
           <Route path="profile" element={<ProfilePage />} />
         </Route>
         <Route path="*" element={<Navigate to="/dashboard" replace />} />

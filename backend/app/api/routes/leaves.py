@@ -193,6 +193,75 @@ def get_user_balance(user_id: int, year: Optional[int] = None,
     return get_or_create_balance(user_id, y, db)
 
 
+@router.get("/report")
+def leave_report(
+    year: Optional[int] = Query(None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Admin/HR/Manager: full leave report with monthly breakdown and per-employee records."""
+    allowed = [UserRole.ADMIN, UserRole.MAIN_MANAGER, UserRole.HR, UserRole.MANAGER, UserRole.TEAM_LEAD]
+    if current_user.role not in allowed:
+        raise HTTPException(403, "Not authorized")
+
+    y = year or date.today().year
+
+    q = db.query(LeaveRequest).filter(
+        LeaveRequest.status == LeaveStatus.APPROVED,
+        LeaveRequest.start_date.between(date(y, 1, 1), date(y, 12, 31)),
+    )
+    if current_user.role in [UserRole.MANAGER, UserRole.TEAM_LEAD]:
+        assigned_ids = [
+            u.id for u in db.query(User).filter(
+                User.manager_id == current_user.id,
+                User.is_active == True,
+            ).all()
+        ]
+        q = q.filter(LeaveRequest.user_id.in_(assigned_ids))
+
+    reqs = q.order_by(LeaveRequest.start_date.asc()).all()
+
+    monthly = {m: 0.0 for m in range(1, 13)}
+    for r in reqs:
+        monthly[r.start_date.month] += r.total_days
+
+    emp_map: dict = {}
+    for r in reqs:
+        uid = r.user_id
+        if uid not in emp_map:
+            u = r.user
+            emp_map[uid] = {
+                "employee_name": u.full_name if u else "—",
+                "profile_image": u.profile_image if u else None,
+                "department": u.department.name if u and u.department else "—",
+                "role": u.role.value if u and u.role else "—",
+                "business_unit": u.business_unit.value if u and u.business_unit else None,
+                "count": 0.0,
+                "leaves": [],
+            }
+        emp_map[uid]["count"] += r.total_days
+        approved_by = "—"
+        if r.main_manager and r.main_manager_action == "approve":
+            approved_by = r.main_manager.full_name
+        elif r.manager and r.manager_action == "approve":
+            approved_by = r.manager.full_name
+        emp_map[uid]["leaves"].append({
+            "start_date": str(r.start_date),
+            "end_date": str(r.end_date),
+            "days": r.total_days,
+            "leave_type": r.leave_type.value if r.leave_type else "—",
+            "reason": r.reason or "",
+            "approved_by": approved_by,
+        })
+
+    return {
+        "year": y,
+        "total": sum(r.total_days for r in reqs),
+        "monthly": [{"month": m, "count": monthly[m]} for m in range(1, 13)],
+        "employees": list(emp_map.values()),
+    }
+
+
 @router.get("/{leave_id}", response_model=LeaveRequestResponse)
 def get_leave(leave_id: int, db: Session = Depends(get_db),
               current_user: User = Depends(get_current_user)):
@@ -219,9 +288,12 @@ def action_leave(leave_id: int, data: LeaveRequestUpdate, background_tasks: Back
     employee = db.query(User).filter(User.id == leave.user_id).first()
 
     if current_user.role in [UserRole.MANAGER, UserRole.TEAM_LEAD]:
-        # Authorize by employee's assigned manager (not leave routing — admin may have been auto-routed)
         if employee.manager_id != current_user.id:
             raise HTTPException(403, "Not your team's leave")
+
+        if data.action == "approve" and _is_weekend_work_request(leave):
+            if date.today() < leave.start_date:
+                raise HTTPException(400, f"Weekend work request can only be approved on or after the work date ({leave.start_date})")
 
         if data.action == "revoke":
             if leave.status != LeaveStatus.APPROVED:
@@ -294,6 +366,10 @@ def action_leave(leave_id: int, data: LeaveRequestUpdate, background_tasks: Back
         leave.manager_action_at = datetime.utcnow()
 
     elif current_user.role in [UserRole.MAIN_MANAGER, UserRole.ADMIN]:
+        if data.action == "approve" and _is_weekend_work_request(leave):
+            if date.today() < leave.start_date:
+                raise HTTPException(400, f"Weekend work request can only be approved on or after the work date ({leave.start_date})")
+
         if data.action == "revoke":
             if leave.status != LeaveStatus.APPROVED:
                 raise HTTPException(400, "Only approved leaves can be revoked")
