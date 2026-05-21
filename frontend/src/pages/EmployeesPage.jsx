@@ -49,7 +49,7 @@ export default function EmployeesPage() {
   const isAdmin = currentUser?.role === "admin";
   const isManager = currentUser?.role === "manager" || currentUser?.role === "team_lead";
   const showBUFilter = !isManager;
-  const canToggleEmployeeOverride = ["manager", "team_lead"].includes(currentUser?.role);
+  const canToggleEmployeeOverride = currentUser?.role === "manager";
   const canToggleManagerOverride = ["admin", "main_manager"].includes(currentUser?.role);
   const departmentFromQuery = searchParams.get("department") || "";
 

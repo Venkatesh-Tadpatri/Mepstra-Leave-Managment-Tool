@@ -41,7 +41,7 @@ function fmtLeaveType(type) {
 function getLeaveTypeLabel(leave) {
   if (leave.leave_type !== "special") return fmtLeaveType(leave.leave_type);
   const isWeekendReq = (leave.reason || "").toLowerCase().startsWith("weekend work request:");
-  return isWeekendReq ? "Weekend Work Request" : "Compensate Leave";
+  return isWeekendReq ? "Weekend / Holiday Work Request" : "Compensate Leave";
 }
 
 const fadeUp = { hidden: { opacity: 0, y: 16 }, show: { opacity: 1, y: 0, transition: { duration: 0.35 } } };

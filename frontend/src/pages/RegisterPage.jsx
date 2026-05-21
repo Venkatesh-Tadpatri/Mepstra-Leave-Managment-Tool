@@ -43,7 +43,7 @@ const BUSINESS_UNITS = [
 ];
 
 const STEPS = ["Employment", "Account", "Verify OTP", "Personal", "Confirm"];
-const MANAGER_ROLES = ["manager", "team_lead", "hr"];
+const MANAGER_ROLES = ["manager", "hr"]; // team_lead reports to a manager, not auto-assigned to admin
 
 const GENDERS = [
   { value: "male",   label: "Male",   symbol: "♂", color: "from-blue-500 to-blue-600",   ring: "ring-blue-400",   bg: "bg-blue-50",   text: "text-blue-700"   },
@@ -191,9 +191,11 @@ export default function RegisterPage() {
     (department) => department.business_unit === form.business_unit
   );
 
-  const filteredManagers = form.department_id
-    ? managers.filter((m) => m.department && String(m.department.id) === String(form.department_id))
-    : managers;
+  const filteredManagers = managers
+    .filter((m) => ["manager", "main_manager"].includes(m.role))
+    .filter((m) => form.department_id
+      ? m.department && String(m.department.id) === String(form.department_id)
+      : true);
 
   useEffect(() => {
     if (!form.department_id) return;

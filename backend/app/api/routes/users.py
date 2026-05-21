@@ -71,7 +71,7 @@ def list_users(role: Optional[str] = None, department_id: Optional[int] = None,
     if current_user.role == UserRole.MANAGER:
         q = q.filter(User.role == UserRole.EMPLOYEE, User.manager_id == current_user.id)
     elif current_user.role == UserRole.TEAM_LEAD:
-        q = q.filter(User.role == UserRole.EMPLOYEE, User.team_lead_id == current_user.id)
+        q = q.filter(User.department_id == current_user.department_id)
     elif current_user.role == UserRole.EMPLOYEE:
         q = q.filter(User.id == current_user.id)
 

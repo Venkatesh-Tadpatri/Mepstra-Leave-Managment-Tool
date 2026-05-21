@@ -199,11 +199,11 @@ export default function DashboardPage() {
   const [leaveFilter, setLeaveFilter] = useState({ status: "", leave_type: "", year: new Date().getFullYear() });
   const [cancelTarget, setCancelTarget] = useState(null);
   const [cancelling, setCancelling] = useState(false);
-  const isAdmin = ["admin", "main_manager", "hr", "manager"].includes(user?.role);
+  const isAdmin = ["admin", "main_manager", "hr", "manager", "team_lead"].includes(user?.role);
   const isStrictAdmin = user?.role === "admin";
   const isHR = user?.role === "hr";
-  const isManager = user?.role === "manager";
-  const showLeaveTable = ["employee", "team_lead"].includes(user?.role);
+  const isManager = ["manager", "team_lead"].includes(user?.role);
+  const showLeaveTable = user?.role === "employee";
   const showScheduleSection = isStrictAdmin || isManager || isHR;
   const showDeptFilter = isStrictAdmin || isHR;
   const canExportReport = ["admin", "hr"].includes(user?.role);

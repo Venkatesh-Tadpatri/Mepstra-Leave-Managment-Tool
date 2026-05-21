@@ -21,11 +21,11 @@ def get_stats(
     today = date.today()
     is_manager_view = current_user.role in [UserRole.MANAGER, UserRole.TEAM_LEAD]
 
-    managed_users_q = db.query(User).filter(User.is_active == True, User.role == UserRole.EMPLOYEE)
+    managed_users_q = db.query(User).filter(User.is_active == True)
     if current_user.role == UserRole.MANAGER:
         managed_users_q = managed_users_q.filter(User.manager_id == current_user.id)
     elif current_user.role == UserRole.TEAM_LEAD:
-        managed_users_q = managed_users_q.filter(User.team_lead_id == current_user.id)
+        managed_users_q = managed_users_q.filter(User.department_id == current_user.department_id)
     if business_unit:
         managed_users_q = managed_users_q.filter(User.business_unit == business_unit)
 
@@ -153,13 +153,11 @@ def on_leave_today(
     if business_unit:
         q = q.filter(User.business_unit == business_unit)
     if is_manager_view:
-        managed_user_ids = [
-            u.id for u in db.query(User).filter(
-                User.is_active == True,
-                User.manager_id == current_user.id if current_user.role == UserRole.MANAGER
-                else User.team_lead_id == current_user.id
-            ).all()
-        ]
+        if current_user.role == UserRole.MANAGER:
+            dept_filter_q = db.query(User).filter(User.is_active == True, User.manager_id == current_user.id)
+        else:
+            dept_filter_q = db.query(User).filter(User.is_active == True, User.department_id == current_user.department_id)
+        managed_user_ids = [u.id for u in dept_filter_q.all()]
         q = q.filter(LeaveRequest.user_id.in_(managed_user_ids))
 
     results = q.all()
@@ -222,13 +220,11 @@ def leave_schedule(
         q = q.filter(User.business_unit == business_unit)
 
     if is_manager_view:
-        managed_ids = [
-            u.id for u in db.query(User).filter(
-                User.is_active == True,
-                User.manager_id == current_user.id if current_user.role == UserRole.MANAGER
-                else User.team_lead_id == current_user.id
-            ).all()
-        ]
+        if current_user.role == UserRole.MANAGER:
+            sched_users = db.query(User).filter(User.is_active == True, User.manager_id == current_user.id).all()
+        else:
+            sched_users = db.query(User).filter(User.is_active == True, User.department_id == current_user.department_id).all()
+        managed_ids = [u.id for u in sched_users]
         q = q.filter(LeaveRequest.user_id.in_(managed_ids))
 
     results = q.all()

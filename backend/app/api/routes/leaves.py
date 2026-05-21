@@ -210,14 +210,14 @@ def leave_report(
         LeaveRequest.status == LeaveStatus.APPROVED,
         LeaveRequest.start_date.between(date(y, 1, 1), date(y, 12, 31)),
     )
-    if current_user.role in [UserRole.MANAGER, UserRole.TEAM_LEAD]:
-        assigned_ids = [
-            u.id for u in db.query(User).filter(
-                User.manager_id == current_user.id,
-                User.is_active == True,
-            ).all()
-        ]
+    if current_user.role == UserRole.MANAGER:
+        assigned_ids = [u.id for u in db.query(User).filter(
+            User.manager_id == current_user.id, User.is_active == True).all()]
         q = q.filter(LeaveRequest.user_id.in_(assigned_ids))
+    elif current_user.role == UserRole.TEAM_LEAD:
+        dept_ids = [u.id for u in db.query(User).filter(
+            User.department_id == current_user.department_id, User.is_active == True).all()]
+        q = q.filter(LeaveRequest.user_id.in_(dept_ids))
 
     reqs = q.order_by(LeaveRequest.start_date.asc()).all()
 

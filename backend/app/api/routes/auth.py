@@ -163,11 +163,12 @@ def register(data: UserCreate, db: Session = Depends(get_db)):
     otp_record = db.query(RegistrationOTP).filter(RegistrationOTP.email == email).first()
     if not otp_record:
         raise HTTPException(status_code=400, detail="Please request and verify an OTP before registration.")
-    if _utcnow() > otp_record.expires_at:
-        db.delete(otp_record)
-        db.commit()
-        raise HTTPException(status_code=400, detail="OTP session expired. Please request a new OTP.")
     if not otp_record.verified_at:
+        # OTP not verified yet — check expiry only for unverified OTPs
+        if _utcnow() > otp_record.expires_at:
+            db.delete(otp_record)
+            db.commit()
+            raise HTTPException(status_code=400, detail="OTP session expired. Please request a new OTP.")
         raise HTTPException(status_code=400, detail="Email OTP not verified. Please verify your OTP first.")
 
     # Check against allowed email whitelist (if the list is non-empty, only those emails may register)

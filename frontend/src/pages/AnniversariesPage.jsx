@@ -216,7 +216,13 @@ function EventCard({ event }) {
       <div className="flex-1 min-w-0">
         <p className="font-semibold text-gray-900 text-sm truncate">{event.name}</p>
         <p className="text-xs text-gray-400 truncate">{event.department}</p>
-        <p className={`text-xs font-medium mt-0.5 ${cfg.text}`}>{event.year_info}</p>
+        <p className="text-xs text-gray-500 mt-0.5">
+          {MONTHS_SHORT[event.month - 1]} {event.day}
+          {event.original_year ? ` · ${event.original_year}` : ""}
+        </p>
+        {event.year_info && (
+          <p className={`text-xs font-semibold mt-0.5 ${cfg.text}`}>{event.year_info}</p>
+        )}
         {/* On mobile show chips inline below name */}
         <div className="flex items-center gap-1.5 mt-1 sm:hidden">
           <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold ${cfg.bg} ${cfg.text}`}>

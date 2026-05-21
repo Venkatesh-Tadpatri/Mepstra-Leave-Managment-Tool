@@ -9,7 +9,7 @@ import { MdCalendarMonth, MdInfo, MdArrowBack, MdSend, MdWarning } from "react-i
 
 const REQUEST_TYPES = [
   { value: "leave", label: "Leave Request" },
-  { value: "weekend_work", label: "Weekend Work Approval Request" },
+  { value: "weekend_work", label: "Weekend / Holiday Work Approval Request" },
   { value: "wfh", label: "Work From Home Request" },
 ];
 
@@ -40,21 +40,26 @@ function getAdvanceNoticeRequired(totalDays) {
   return 15;
 }
 
-function countWeekendDays(startDate, endDate) {
+function countWeekendDays(startDate, endDate, mandatoryHolidayDates = new Set()) {
   const start = new Date(startDate);
   const end = new Date(endDate);
   let current = new Date(start);
   let count = 0;
-  let hasWeekday = false;
+  let hasRegularWeekday = false;
 
   while (current <= end) {
     const day = current.getDay();
-    if (day === 0 || day === 6) count += 1;
-    else hasWeekday = true;
+    const ds = current.toISOString().split("T")[0];
+    const isWeekend = day === 0 || day === 6;
+    const isMandatoryHoliday = mandatoryHolidayDates.has(ds);
+
+    if (isWeekend || isMandatoryHoliday) count += 1;
+    else hasRegularWeekday = true;
+
     current.setDate(current.getDate() + 1);
   }
 
-  return { count, hasWeekday };
+  return { count, hasWeekday: hasRegularWeekday };
 }
 
 export default function ApplyLeavePage() {
@@ -78,6 +83,7 @@ export default function ApplyLeavePage() {
   const [workingDays, setWorkingDays] = useState(0);
   const [advanceWarning, setAdvanceWarning] = useState("");
   const [weekendWarning, setWeekendWarning] = useState("");
+  const [holidayWarning, setHolidayWarning] = useState("");
   const [managerOverrideEnabled, setManagerOverrideEnabled] = useState(false);
   const [form, setForm] = useState({
     request_type: "leave",
@@ -130,6 +136,7 @@ export default function ApplyLeavePage() {
       setWorkingDays(0);
       setAdvanceWarning("");
       setWeekendWarning("");
+      setHolidayWarning("");
       return;
     }
 
@@ -151,14 +158,18 @@ export default function ApplyLeavePage() {
     }
 
     if (isWeekendRequest) {
-      const { count, hasWeekday } = countWeekendDays(form.start_date, form.end_date);
+      const mandatoryHolidayDates = new Set(
+        holidays.filter((h) => h.holiday_type === "mandatory").map((h) => h.date)
+      );
+      const { count, hasWeekday } = countWeekendDays(form.start_date, form.end_date, mandatoryHolidayDates);
       const days = form.half_day ? 0.5 : count;
       setWorkingDays(days);
       setAdvanceWarning("");
+      setHolidayWarning("");
       if (hasWeekday) {
-        setWeekendWarning("Weekend work request accepts only Saturday/Sunday dates.");
+        setWeekendWarning("Weekend work request accepts only Saturday, Sunday or company declared holiday dates.");
       } else if (count <= 0) {
-        setWeekendWarning("Select at least one Saturday or Sunday.");
+        setWeekendWarning("Select at least one Saturday, Sunday or company declared holiday date.");
       } else {
         setWeekendWarning("");
       }
@@ -168,22 +179,42 @@ export default function ApplyLeavePage() {
     let count;
     if (isCalendarLeave) {
       count = differenceInCalendarDays(end, start) + 1;
+      setHolidayWarning("");
     } else {
-      const holidayDates = new Set(
-        holidays.filter((h) => h.holiday_type === "mandatory").map((h) => h.date)
-      );
+      const mandatoryHolidays = holidays.filter((h) => h.holiday_type === "mandatory");
+      const holidayDates = new Set(mandatoryHolidays.map((h) => h.date));
       count = 0;
       let cur = new Date(start);
+      // Check if all selected days are mandatory holidays
+      let totalSelectedWeekdays = 0;
+      let holidayBlockedDays = 0;
       while (cur <= end) {
         const ds = format(cur, "yyyy-MM-dd");
         const day = cur.getDay();
         const isSun = day === 0;
         const isSat = day === 6;
-        // 2nd and 4th Saturdays are working days
         const satNum = Math.ceil(cur.getDate() / 7);
         const isWorkingSat = isSat && satNum % 2 === 0;
-        if (!isSun && (!isSat || isWorkingSat) && !holidayDates.has(ds)) count++;
+        const isWeekday = !isSun && (!isSat || isWorkingSat);
+        if (isWeekday) {
+          totalSelectedWeekdays++;
+          if (holidayDates.has(ds)) holidayBlockedDays++;
+          else count++;
+        }
         cur.setDate(cur.getDate() + 1);
+      }
+      // All selected weekdays are mandatory holidays
+      if (totalSelectedWeekdays > 0 && holidayBlockedDays === totalSelectedWeekdays) {
+        const blockedNames = mandatoryHolidays
+          .filter((h) => {
+            const d = new Date(h.date);
+            return d >= start && d <= end;
+          })
+          .map((h) => h.name)
+          .join(", ");
+        setHolidayWarning(`Selected day(s) are already declared as company holiday — ${blockedNames}`);
+      } else {
+        setHolidayWarning("");
       }
     }
     const days = form.half_day ? 0.5 : count;
@@ -738,6 +769,20 @@ export default function ApplyLeavePage() {
           </AnimatePresence>
 
           <AnimatePresence>
+            {holidayWarning && !isWeekendRequest && !isWFH && !isOptionalLeave && (
+              <motion.div
+                initial={{ opacity: 0, y: -6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                className="mt-3 flex items-start gap-2 rounded-xl px-4 py-3 text-sm font-medium bg-red-50 text-red-700 border border-red-200"
+              >
+                <MdWarning className="text-lg flex-shrink-0 mt-0.5" />
+                <span>{holidayWarning}</span>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <AnimatePresence>
             {advanceWarning && !isWeekendRequest && !isWFH && (
               <motion.div
                 initial={{ opacity: 0, y: -6 }}
@@ -802,7 +847,7 @@ export default function ApplyLeavePage() {
           </button>
           <motion.button
             type="submit"
-            disabled={loading || (!isWFH && isInsufficient) || (!!weekendWarning && isWeekendRequest) || (!isWeekendRequest && !isWFH && isCompensate && specialAvailable < 1) || (!isWFH && advanceWarning.startsWith("advance notice required"))}
+            disabled={loading || (!isWFH && isInsufficient) || (!!weekendWarning && isWeekendRequest) || (!isWeekendRequest && !isWFH && isCompensate && specialAvailable < 1) || (!isWFH && advanceWarning.startsWith("advance notice required")) || (!!holidayWarning && !isWeekendRequest && !isWFH)}
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             className="flex-1 py-3 bg-gradient-to-r from-blue-600 to-violet-600 text-white rounded-xl font-bold shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-shadow"

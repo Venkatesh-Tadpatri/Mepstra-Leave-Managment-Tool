@@ -30,7 +30,7 @@ function fmtLeaveType(type) {
 function getLeaveTypeLabel(leave) {
   if (leave.leave_type !== "special") return fmtLeaveType(leave.leave_type);
   const isWeekendReq = (leave.reason || "").toLowerCase().startsWith("weekend work request:");
-  return isWeekendReq ? "Weekend Work Request" : "Compensate Leave";
+  return isWeekendReq ? "Weekend / Holiday Work Request" : "Compensate Leave";
 }
 
 function ActionModal({ leave, onClose, onAction }) {
@@ -342,8 +342,8 @@ export default function PendingApprovalsPage() {
   const { pending, loading } = useSelector((s) => s.leaves);
   const { user } = useSelector((s) => s.auth);
   const isHR = user?.role === "hr";
-  const isEmployee = user?.role === "employee";
-  const canRevoke = ["manager", "team_lead", "main_manager", "admin"].includes(user?.role);
+  const isEmployee = ["employee", "team_lead"].includes(user?.role);
+  const canRevoke = ["manager", "main_manager", "admin"].includes(user?.role);
 
   const [selected, setSelected] = useState(null);
   const [activeTab, setActiveTab] = useState("leave");

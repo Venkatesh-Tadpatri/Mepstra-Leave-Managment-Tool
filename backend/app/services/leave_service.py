@@ -35,20 +35,36 @@ def get_working_days(start: date, end: date, db: Session) -> float:
     return count
 
 
-def get_weekend_days(start: date, end: date) -> float:
+def get_weekend_days(start: date, end: date, db: Session = None) -> float:
+    """Count weekend days + mandatory holiday weekdays (both earn special leave credit)."""
+    mandatory_dates = set()
+    if db:
+        holidays = db.query(Holiday).filter(
+            Holiday.date.between(start, end),
+            Holiday.holiday_type == HolidayType.MANDATORY
+        ).all()
+        mandatory_dates = {h.date for h in holidays}
     count = 0.0
     current = start
     while current <= end:
-        if current.weekday() >= 5:
+        if current.weekday() >= 5 or current in mandatory_dates:
             count += 1
         current += timedelta(days=1)
     return count
 
 
-def has_weekday_in_range(start: date, end: date) -> bool:
+def has_weekday_in_range(start: date, end: date, db: Session = None) -> bool:
+    """Returns True if range contains regular weekdays (excluding mandatory holidays)."""
+    mandatory_dates = set()
+    if db:
+        holidays = db.query(Holiday).filter(
+            Holiday.date.between(start, end),
+            Holiday.holiday_type == HolidayType.MANDATORY
+        ).all()
+        mandatory_dates = {h.date for h in holidays}
     current = start
     while current <= end:
-        if current.weekday() < 5:
+        if current.weekday() < 5 and current not in mandatory_dates:
             return True
         current += timedelta(days=1)
     return False
@@ -253,9 +269,9 @@ def create_leave_request(user_id: int, data: LeaveRequestCreate, db: Session):
             raise ValueError("Leave start date cannot be in the past. For sick leave applied after return, use the retroactive option.")
 
     if is_weekend_work_request:
-        if has_weekday_in_range(data.start_date, data.end_date):
-            raise ValueError("Weekend work request must include only Saturday/Sunday dates.")
-        total_days = get_weekend_days(data.start_date, data.end_date)
+        if has_weekday_in_range(data.start_date, data.end_date, db):
+            raise ValueError("Weekend work request must include only Saturday/Sunday or company declared holiday dates.")
+        total_days = get_weekend_days(data.start_date, data.end_date, db)
         if data.half_day:
             if data.start_date != data.end_date:
                 raise ValueError("Half-day weekend request can be applied for a single date only.")
