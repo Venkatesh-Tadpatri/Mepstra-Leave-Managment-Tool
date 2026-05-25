@@ -4,7 +4,7 @@ import toast from "react-hot-toast";
 import { getAllowedEmails, addAllowedEmail, updateAllowedEmail, removeAllowedEmail } from "../services/api";
 import {
   MdEmail, MdAdd, MdDelete, MdClose, MdSearch, MdShield,
-  MdPerson, MdEdit, MdCheck, MdWarning,
+  MdPerson, MdEdit, MdCheck, MdWarning, MdWork,
 } from "react-icons/md";
 import { SiGmail } from "react-icons/si";
 import AllowedEmailsUploadButton from "../components/allowedEmails/AllowedEmailsUploadButton";
@@ -12,8 +12,17 @@ import AllowedEmailsUploadButton from "../components/allowedEmails/AllowedEmails
 const fadeUp = { hidden: { opacity: 0, y: 16 }, show: { opacity: 1, y: 0, transition: { duration: 0.3 } } };
 const stagger = { show: { transition: { staggerChildren: 0.06 } } };
 
-const EMPTY_FORM = { employee_name: "", outlook_email: "", gmail: "", casual_leaves: 12, sick_leaves: 6, optional_leaves: 2 };
-const EMPTY_ERRORS = { outlook_email: "", gmail: "" };
+const ROLE_OPTIONS = [
+  { value: "",           label: "— No restriction —" },
+  { value: "employee",   label: "Employee" },
+  { value: "team_lead",  label: "Team Lead" },
+  { value: "manager",    label: "Manager" },
+  { value: "hr",         label: "HR / Admin" },
+  { value: "main_manager", label: "Main Manager" },
+];
+
+const EMPTY_FORM = { employee_name: "", outlook_email: "", gmail: "", casual_leaves: 12, sick_leaves: 6, optional_leaves: 2, role: "" };
+const EMPTY_ERRORS = { outlook_email: "", gmail: "", role: "" };
 
 function ConfirmModal({ name, onConfirm, onCancel }) {
   return (
@@ -83,7 +92,7 @@ export default function AllowedEmailsPage() {
 
   async function handleAdd(e) {
     e.preventDefault();
-    const errs = { outlook_email: "", gmail: "" };
+    const errs = { outlook_email: "", gmail: "", role: "" };
     const outlook = form.outlook_email.trim().toLowerCase();
     const gmail = form.gmail.trim().toLowerCase();
 
@@ -97,7 +106,10 @@ export default function AllowedEmailsPage() {
     if (outlook && gmail && outlook === gmail) {
       errs.gmail = "Office email must be different from the Outlook email";
     }
-    if (errs.outlook_email || errs.gmail) {
+    if (!form.role) {
+      errs.role = "Please select a role for this employee";
+    }
+    if (errs.outlook_email || errs.gmail || errs.role) {
       setFormErrors(errs);
       return;
     }
@@ -111,6 +123,7 @@ export default function AllowedEmailsPage() {
         casual_leaves: Number(form.casual_leaves),
         sick_leaves: Number(form.sick_leaves),
         optional_leaves: Number(form.optional_leaves),
+        role: form.role || undefined,
       });
       toast.success("Employee added to whitelist");
       setForm(EMPTY_FORM);
@@ -133,6 +146,7 @@ export default function AllowedEmailsPage() {
         casual_leaves: Number(editForm.casual_leaves),
         sick_leaves: Number(editForm.sick_leaves),
         optional_leaves: Number(editForm.optional_leaves),
+        role: editForm.role || null,
       });
       toast.success("Updated");
       setEditingId(null);
@@ -171,6 +185,7 @@ export default function AllowedEmailsPage() {
       casual_leaves: entry.casual_leaves ?? 12,
       sick_leaves: entry.sick_leaves ?? 6,
       optional_leaves: entry.optional_leaves ?? 2,
+      role: entry.role || "",
     });
   }
 
@@ -247,6 +262,7 @@ export default function AllowedEmailsPage() {
                 <th className="px-4 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">
                   <span className="flex items-center gap-1.5"><SiGmail className="text-red-500" /> Office Email</span>
                 </th>
+                <th className="px-4 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Role</th>
                 <th className="px-4 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Leave Quota</th>
                 <th className="px-4 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Added On</th>
                 <th className="px-4 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Actions</th>
@@ -315,6 +331,25 @@ export default function AllowedEmailsPage() {
                       </div>
                     ) : (
                       <span className="text-gray-300 text-xs italic">Not added</span>
+                    )}
+                  </td>
+
+                  {/* Role */}
+                  <td className="px-4 py-3">
+                    {editingId === entry.id ? (
+                      <select
+                        value={editForm.role}
+                        onChange={(e) => setEditForm((f) => ({ ...f, role: e.target.value }))}
+                        className="w-full px-2 py-1.5 text-xs border border-violet-300 rounded-lg focus:outline-none focus:border-violet-500 bg-violet-50 min-w-[110px]"
+                      >
+                        {ROLE_OPTIONS.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
+                      </select>
+                    ) : entry.role ? (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-violet-100 text-violet-700 text-xs font-semibold capitalize">
+                        {entry.role.replace("_", " ")}
+                      </span>
+                    ) : (
+                      <span className="text-gray-300 text-xs italic">Any</span>
                     )}
                   </td>
 
@@ -406,7 +441,7 @@ export default function AllowedEmailsPage() {
 
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-4 py-16 text-center">
+                  <td colSpan={8} className="px-4 py-16 text-center">
                     <MdEmail className="text-gray-200 text-5xl mx-auto mb-3" />
                     <p className="text-gray-400">
                       {search ? "No matching employees" : "No employees in whitelist — domain validation is active"}
@@ -424,7 +459,7 @@ export default function AllowedEmailsPage() {
         {adding && (
           <>
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              onClick={() => { setAdding(false); setFormErrors(EMPTY_ERRORS); }}
+              onClick={() => { setAdding(false); setForm(EMPTY_FORM); setFormErrors(EMPTY_ERRORS); }}
               className="fixed inset-0 bg-black/30 backdrop-blur-sm z-40" />
             <motion.div
               initial={{ x: "100%" }} animate={{ x: 0 }} exit={{ x: "100%" }}
@@ -441,7 +476,7 @@ export default function AllowedEmailsPage() {
                     <p className="text-slate-400 text-xs mt-0.5">Allow this employee to register</p>
                   </div>
                 </div>
-                <button onClick={() => setAdding(false)}
+                <button onClick={() => { setAdding(false); setForm(EMPTY_FORM); setFormErrors(EMPTY_ERRORS); }}
                   className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition-colors">
                   <MdClose />
                 </button>
@@ -510,6 +545,27 @@ export default function AllowedEmailsPage() {
                   {formErrors.gmail && <p className="text-xs text-red-500 mt-1">{formErrors.gmail}</p>}
                   <p className="text-[10px] text-gray-400 mt-1">Any email accepted. Must be different from Outlook email.</p>
 
+                </div>
+
+                {/* Role */}
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
+                    Assigned Role <span className="text-red-400">*</span>
+                  </label>
+                  <div className="relative">
+                    <MdWork className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-base" />
+                    <select
+                      value={form.role}
+                      onChange={(e) => { setForm((f) => ({ ...f, role: e.target.value })); setFormErrors((er) => ({ ...er, role: "" })); }}
+                      className={`input-field text-sm pl-9 appearance-none ${formErrors.role ? "border-red-400 focus:border-red-400" : ""}`}
+                    >
+                      {ROLE_OPTIONS.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
+                    </select>
+                  </div>
+                  {formErrors.role
+                    ? <p className="text-xs text-red-500 mt-1">{formErrors.role}</p>
+                    : <p className="text-[10px] text-gray-400 mt-1">Employee will only be allowed to register with this role.</p>
+                  }
                 </div>
 
                 {/* Leave Quota */}

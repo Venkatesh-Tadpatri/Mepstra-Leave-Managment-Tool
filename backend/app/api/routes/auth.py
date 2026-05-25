@@ -80,6 +80,21 @@ def login_swagger(form: OAuth2PasswordRequestForm = Depends(), db: Session = Dep
     return Token(access_token=token, token_type="bearer", user=user)
 
 
+@router.get("/check-email")
+def check_email_role(email: str, db: Session = Depends(get_db)):
+    """Return the HR-assigned role for an email (used to restrict registration role dropdown)."""
+    normalized = email.strip().lower()
+    allowed_count = db.query(AllowedEmail).count()
+    if allowed_count == 0:
+        return {"in_whitelist": True, "assigned_role": None}
+    allowed = db.query(AllowedEmail).filter(
+        or_(AllowedEmail.outlook_email == normalized, AllowedEmail.gmail == normalized)
+    ).first()
+    if not allowed:
+        return {"in_whitelist": False, "assigned_role": None}
+    return {"in_whitelist": True, "assigned_role": allowed.role}
+
+
 @router.post("/send-otp", status_code=200)
 def send_otp(data: OTPSendRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     """Send a 6-digit OTP to the given email for registration verification."""
@@ -90,6 +105,7 @@ def send_otp(data: OTPSendRequest, background_tasks: BackgroundTasks, db: Sessio
 
     # If whitelist is non-empty, only pre-approved emails may register
     allowed_count = db.query(AllowedEmail).count()
+    allowed = None
     if allowed_count > 0:
         allowed = db.query(AllowedEmail).filter(
             or_(AllowedEmail.outlook_email == email, AllowedEmail.gmail == email)
@@ -132,7 +148,11 @@ def send_otp(data: OTPSendRequest, background_tasks: BackgroundTasks, db: Sessio
     logger.info("OTP for %s: %s", email, otp)
     print(f"\n>>> OTP for {email}: {otp} (valid 2 min) <<<\n")
 
-    return {"message": "OTP sent to your email address", "expires_in_seconds": OTP_EXPIRY_SECONDS}
+    assigned_role = None
+    if allowed_count > 0 and allowed:
+        assigned_role = allowed.role
+
+    return {"message": "OTP sent to your email address", "expires_in_seconds": OTP_EXPIRY_SECONDS, "assigned_role": assigned_role}
 
 
 @router.post("/verify-otp", status_code=200)
@@ -189,6 +209,12 @@ def register(data: UserCreate, db: Session = Depends(get_db)):
             raise HTTPException(
                 status_code=400,
                 detail="An account already exists for this employee. Each employee can only register once.",
+            )
+        # Validate that the chosen role matches the HR-assigned role
+        if whitelist_entry.role and data.role.value != whitelist_entry.role:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Your account has been assigned the role '{whitelist_entry.role}' by HR. Please select that role to complete registration."
             )
 
     if db.query(User).filter(User.email == email).first():

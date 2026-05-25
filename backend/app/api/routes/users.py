@@ -195,7 +195,6 @@ def get_anniversaries(
                 "day": dob.day,
                 "month": dob.month,
                 "original_year": dob.year,
-                "year_info": f"Turning {turning}",
                 "days_until": du,
             })
 
@@ -209,7 +208,7 @@ def get_anniversaries(
             elif du <= 180:
                 label = f"Completing {years_at} year{'s' if years_at != 1 else ''}"
             else:
-                label = f"Completed {years_at - 1} year{'s' if years_at - 1 != 1 else ''}"
+                label = f"Completed {years_at} year{'s' if years_at != 1 else ''}"
             months[jd.month].append({
                 **base,
                 "type": "work_anniversary",
@@ -229,7 +228,7 @@ def get_anniversaries(
             elif du <= 180:
                 label = f"Completing {years_married} year{'s' if years_married != 1 else ''}"
             else:
-                label = f"Completed {years_married - 1} year{'s' if years_married - 1 != 1 else ''}"
+                label = f"Completed {years_married} year{'s' if years_married != 1 else ''}"
             months[md.month].append({
                 **base,
                 "type": "marriage_anniversary",

@@ -294,6 +294,7 @@ class AllowedEmailCreate(BaseModel):
     casual_leaves: float = 12.0
     sick_leaves: float = 6.0
     optional_leaves: float = 2.0
+    role: Optional[str] = None
 
     @field_validator("outlook_email", "gmail", mode="before")
     @classmethod
@@ -322,6 +323,7 @@ class AllowedEmailUpdate(BaseModel):
     casual_leaves: Optional[float] = None
     sick_leaves: Optional[float] = None
     optional_leaves: Optional[float] = None
+    role: Optional[str] = None
 
     @field_validator("outlook_email", "gmail", mode="before")
     @classmethod
@@ -338,6 +340,7 @@ class AllowedEmailResponse(BaseModel):
     casual_leaves: float = 12.0
     sick_leaves: float = 6.0
     optional_leaves: float = 2.0
+    role: Optional[str] = None
     created_at: datetime
 
     model_config = {"from_attributes": True}

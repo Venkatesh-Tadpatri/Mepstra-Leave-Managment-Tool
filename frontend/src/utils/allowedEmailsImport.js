@@ -19,11 +19,15 @@ function getCell(row, headers, names) {
   return index >= 0 ? row[index] : "";
 }
 
+const VALID_ROLES = ["employee", "team_lead", "manager", "hr", "main_manager"];
+
 function rowToAllowedEmail(row, headers) {
   const employee_name = String(getCell(row, headers, ["employee name", "name"])).trim();
   const outlook_email = cleanEmail(getCell(row, headers, ["outlook email", "mepstra email", "company email"]));
   const gmail = cleanEmail(getCell(row, headers, ["office email", "gmail", "personal email"]));
   const notes = String(getCell(row, headers, ["notes", "note"])).trim();
+  const rawRole = String(getCell(row, headers, ["role", "assigned role"])).trim().toLowerCase().replace(/\s+/g, "_");
+  const role = VALID_ROLES.includes(rawRole) ? rawRole : undefined;
 
   if (!employee_name || (!outlook_email && !gmail)) return null;
 
@@ -35,6 +39,7 @@ function rowToAllowedEmail(row, headers) {
     casual_leaves: toNumber(getCell(row, headers, ["casual leaves", "casual", "cl"]), 12),
     sick_leaves: toNumber(getCell(row, headers, ["sick leaves", "sick", "sl"]), 6),
     optional_leaves: toNumber(getCell(row, headers, ["optional leaves", "optional", "ol"]), 2),
+    role: role || undefined,
   };
 }
 
@@ -68,10 +73,10 @@ export async function parseAllowedEmailsFile(file) {
 
 export function downloadAllowedEmailsTemplate() {
   const rows = [
-    ["Employee Name", "Outlook Email", "Office Email", "Casual Leaves", "Sick Leaves", "Optional Leaves", "Notes"],
-    ["John Doe", "john.doe@mepstra.com", "john.doe@gmail.com", 12, 6, 2, ""],
-    ["Priya Sharma", "priya.sharma@mepstra.com", "", 12, 6, 2, "Only Outlook email"],
-    ["Rahul Reddy", "", "rahul.reddy@gmail.com", 10, 5, 2, "Mid-year joining"],
+    ["Employee Name", "Outlook Email", "Office Email", "Casual Leaves", "Sick Leaves", "Optional Leaves", "Role", "Notes"],
+    ["John Doe", "john.doe@mepstra.com", "john.doe@gmail.com", 12, 6, 2, "employee", ""],
+    ["Priya Sharma", "priya.sharma@mepstra.com", "", 12, 6, 2, "manager", "Only Outlook email"],
+    ["Rahul Reddy", "", "rahul.reddy@gmail.com", 10, 5, 2, "team_lead", "Mid-year joining"],
   ];
 
   const worksheet = XLSX.utils.aoa_to_sheet(rows);
@@ -82,6 +87,7 @@ export function downloadAllowedEmailsTemplate() {
     { wch: 14 },
     { wch: 12 },
     { wch: 16 },
+    { wch: 14 },
     { wch: 28 },
   ];
 

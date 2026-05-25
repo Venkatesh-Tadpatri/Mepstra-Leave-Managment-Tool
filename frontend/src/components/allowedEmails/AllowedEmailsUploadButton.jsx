@@ -45,6 +45,8 @@ export default function AllowedEmailsUploadButton({ onImported }) {
     }));
   }
 
+  const VALID_ROLES = ["", "employee", "team_lead", "manager", "hr", "main_manager"];
+
   async function savePreview() {
     const rows = (preview?.rows || []).filter((row) => row.employee_name.trim() && (row.outlook_email || row.gmail));
     if (rows.length === 0) {
@@ -78,6 +80,7 @@ export default function AllowedEmailsUploadButton({ onImported }) {
         casual_leaves: Number(row.casual_leaves),
         sick_leaves: Number(row.sick_leaves),
         optional_leaves: Number(row.optional_leaves),
+        role: row.role || undefined,
       }));
       const res = await bulkUpsertAllowedEmails(payload);
       toast.success(`${res.data.created} added, ${res.data.updated} updated from ${preview.fileName}`);
@@ -138,6 +141,7 @@ export default function AllowedEmailsUploadButton({ onImported }) {
                     <th className="px-3 py-3 text-left font-bold">CL</th>
                     <th className="px-3 py-3 text-left font-bold">SL</th>
                     <th className="px-3 py-3 text-left font-bold">OL</th>
+                    <th className="px-3 py-3 text-left font-bold">Role</th>
                     <th className="px-3 py-3 text-left font-bold">Notes</th>
                     <th className="w-12 px-3 py-3"></th>
                   </tr>
@@ -152,7 +156,6 @@ export default function AllowedEmailsUploadButton({ onImported }) {
                         ["casual_leaves", "number", "12"],
                         ["sick_leaves", "number", "6"],
                         ["optional_leaves", "number", "2"],
-                        ["notes", "text", "Notes"],
                       ].map(([field, type, placeholder]) => (
                         <td key={field} className="border-t border-blue-50 px-3 py-2">
                           <input
@@ -165,6 +168,28 @@ export default function AllowedEmailsUploadButton({ onImported }) {
                           />
                         </td>
                       ))}
+                      {/* Role dropdown */}
+                      <td className="border-t border-blue-50 px-3 py-2">
+                        <select
+                          value={row.role || ""}
+                          onChange={(e) => updateRow(index, "role", e.target.value)}
+                          className="w-full rounded-lg border border-blue-100 px-2 py-2 text-xs focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 min-w-[100px]"
+                        >
+                          {VALID_ROLES.map((r) => (
+                            <option key={r} value={r}>{r ? r.replace("_", " ") : "— any —"}</option>
+                          ))}
+                        </select>
+                      </td>
+                      {/* Notes */}
+                      <td className="border-t border-blue-50 px-3 py-2">
+                        <input
+                          type="text"
+                          value={row.notes || ""}
+                          placeholder="Notes"
+                          onChange={(e) => updateRow(index, "notes", e.target.value)}
+                          className="w-full rounded-lg border border-blue-100 px-2.5 py-2 text-xs focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                        />
+                      </td>
                       <td className="border-t border-blue-50 px-3 py-2 text-center">
                         <button type="button" onClick={() => removeRow(index)} className="rounded-lg p-2 text-red-400 hover:bg-red-50 hover:text-red-600" title="Remove row">
                           <MdDelete />

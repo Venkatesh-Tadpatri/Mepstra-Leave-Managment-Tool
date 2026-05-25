@@ -311,6 +311,14 @@ def run_migrations():
                 ))
                 conn.commit()
 
+        # ── allowed_emails: role column ──────────────────────────────────
+        if not _column_exists(conn, "allowed_emails", "role"):
+            logger.info("Adding allowed_emails.role")
+            conn.execute(text(
+                "ALTER TABLE allowed_emails ADD COLUMN role VARCHAR(50) NULL"
+            ))
+            conn.commit()
+
         # registration_otps: move from older hashed OTP column to plain OTP column.
         # Existing OTP rows are temporary, so it is safe to clear them during shape changes.
         if _table_exists(conn, "registration_otps") and not _column_exists(conn, "registration_otps", "otp"):

@@ -44,6 +44,7 @@ def add_allowed_email(
         casual_leaves=data.casual_leaves,
         sick_leaves=data.sick_leaves,
         optional_leaves=data.optional_leaves,
+        role=data.role or None,
         added_by_id=current_user.id,
     )
     db.add(entry)
@@ -88,6 +89,8 @@ def bulk_upsert_allowed_emails(
             entry.casual_leaves = item.casual_leaves
             entry.sick_leaves = item.sick_leaves
             entry.optional_leaves = item.optional_leaves
+            if item.role is not None:
+                entry.role = item.role or None
             updated.append(item.employee_name)
             continue
 
@@ -99,6 +102,7 @@ def bulk_upsert_allowed_emails(
             casual_leaves=item.casual_leaves,
             sick_leaves=item.sick_leaves,
             optional_leaves=item.optional_leaves,
+            role=item.role or None,
             added_by_id=current_user.id,
         )
         db.add(entry)
@@ -145,6 +149,9 @@ def update_allowed_email(
 
     if data.notes is not None:
         entry.notes = data.notes or None
+
+    if data.role is not None:
+        entry.role = data.role or None
 
     leave_changed = False
     if data.casual_leaves is not None:

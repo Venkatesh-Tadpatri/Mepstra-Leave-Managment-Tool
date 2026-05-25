@@ -200,6 +200,7 @@ class AllowedEmail(Base):
     casual_leaves = Column(Float, default=12.0)
     sick_leaves = Column(Float, default=6.0)
     optional_leaves = Column(Float, default=2.0)
+    role = Column(String(50), nullable=True)
     added_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     registered_user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

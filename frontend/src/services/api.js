@@ -41,6 +41,7 @@ export const login                         = (data) => API.post("/auth/login", d
 export const register                      = (data) => API.post("/auth/register", data);
 export const sendOTP                       = (data) => API.post("/auth/send-otp", data);
 export const verifyOTP                     = (data) => API.post("/auth/verify-otp", data);
+export const checkEmailRole                = (email) => API.get(`/auth/check-email?email=${encodeURIComponent(email)}`);
 
 // ---- Users ---------------------------------------------------------
 export const ME_API                        = `${BASE_URL}/users/me`;

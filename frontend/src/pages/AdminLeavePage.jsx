@@ -314,7 +314,7 @@ export default function AdminLeavePage() {
       <motion.div variants={stagger} className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
           { icon: MdEventNote,      label: month === 0 ? "Total Leave Days (Year)" : `Total Leave Days (${MONTHS[month - 1]})`, value: loading ? "—" : displayTotal,        gradient: "linear-gradient(135deg,#34d399,#059669)" },
-          { icon: MdPeople,         label: "Employees on Leave", value: loading ? "—" : (month === 0 ? deptRoleFiltered.length : filteredEmployees.length), gradient: "linear-gradient(135deg,#667eea,#764ba2)" },
+          { icon: MdPeople,         label: "Employees Used Leave", value: loading ? "—" : (month === 0 ? deptRoleFiltered.length : filteredEmployees.length), gradient: "linear-gradient(135deg,#667eea,#764ba2)" },
           { icon: MdCalendarMonth,  label: "This Month",         value: loading ? "—" : filteredThisMonth,  gradient: "linear-gradient(135deg,#f093fb,#f5576c)" },
           { icon: MdBarChart,       label: "Peak Month",         value: loading ? "—" : filteredPeakMonth,  gradient: "linear-gradient(135deg,#43e97b,#38f9d7)" },
         ].map(({ icon: Icon, label, value, gradient }) => (

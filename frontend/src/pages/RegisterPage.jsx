@@ -11,7 +11,7 @@ import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import toast from "react-hot-toast";
-import { register, getDepartments, getManagers, getAdminUser } from "../services/api";
+import { register, getDepartments, getManagers, getAdminUser, checkEmailRole } from "../services/api";
 import api from "../services/api";
 import {
   MdPerson, MdEmail, MdLock, MdPhone, MdWork, MdBusiness,
@@ -156,6 +156,8 @@ export default function RegisterPage() {
   const [otpSendLoading, setOtpSendLoading] = useState(false);
   const [otpTimer, setOtpTimer] = useState(0);
   const [step, setStep] = useState(1);
+  const [assignedRole, setAssignedRole] = useState(null);
+  const [emailRoleChecked, setEmailRoleChecked] = useState(false);
   const [form, setForm] = useState({
     employment_type: "", business_unit: "",
     full_name: "", email: "", pin: "", confirm_pin: "",
@@ -223,10 +225,33 @@ export default function RegisterPage() {
   function handleChange(e) {
     let { name, value } = e.target;
     if (name === "phone") value = value.replace(/\D/g, "").slice(0, 10);
-    if (name === "email") value = value.toLowerCase();
+    if (name === "email") {
+      value = value.toLowerCase();
+      // Reset role restriction when email changes
+      setAssignedRole(null);
+      setEmailRoleChecked(false);
+    }
     if (name === "full_name") value = value.replace(/\b\w/g, (char) => char.toUpperCase());
     setForm((f) => ({ ...f, [name]: value }));
     if (errors[name]) setErrors((er) => ({ ...er, [name]: "" }));
+  }
+
+  async function handleEmailBlur() {
+    const email = form.email.trim().toLowerCase();
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return;
+    try {
+      const res = await checkEmailRole(email);
+      const role = res.data?.assigned_role;
+      if (role) {
+        setAssignedRole(role);
+        setForm((f) => ({ ...f, role }));
+      } else {
+        setAssignedRole(null);
+      }
+      setEmailRoleChecked(true);
+    } catch {
+      // Silently ignore — validation happens on send-otp anyway
+    }
   }
 
   function validateStep1() {
@@ -266,7 +291,7 @@ export default function RegisterPage() {
   async function handleSendOtp() {
     setOtpSendLoading(true);
     try {
-      await api.post("/auth/send-otp", { email: form.email.trim().toLowerCase() });
+      const res = await api.post("/auth/send-otp", { email: form.email.trim().toLowerCase() });
       setOtpSent(true);
       setOtpVerified(false);
       setOtpTimer(120);
@@ -665,7 +690,7 @@ export default function RegisterPage() {
 
               <div>
                 <InputField label={<>Email Address <span className="text-red-500">*</span></>} icon={MdEmail} type="email" name="email"
-                  value={form.email} onChange={handleChange} placeholder="you@mepstra.com" error={errors.email} required
+                  value={form.email} onChange={handleChange} onBlur={handleEmailBlur} placeholder="you@mepstra.com" error={errors.email} required
                   autoCapitalize="none" autoCorrect="off" spellCheck="false" style={{ textTransform: "lowercase" }} />
                 <p className="text-xs text-amber-600 mt-0.5 font-medium">⚠ Only pre-approved company emails can register.</p>
               </div>
@@ -695,13 +720,22 @@ export default function RegisterPage() {
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1 uppercase tracking-wide">Role <span className="text-red-500">*</span></label>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1 uppercase tracking-wide">
+                    Role <span className="text-red-500">*</span>
+                    {assignedRole && <span className="ml-1 text-violet-600 normal-case font-normal text-[10px]">(assigned by HR)</span>}
+                  </label>
                   <div className="relative">
                     <MdWork className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-base" />
-                    <select name="role" value={form.role} onChange={handleChange}
-                      className="w-full pl-10 pr-3 py-2 text-sm border border-gray-200 rounded-lg bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 transition-all appearance-none">
-                      {ROLES.map((r) => <option key={r.value} value={r.value}>{r.icon} {r.label}</option>)}
-                    </select>
+                    {assignedRole ? (
+                      <div className="w-full pl-10 pr-3 py-2 text-sm border border-violet-300 rounded-lg bg-violet-50 text-violet-700 font-medium capitalize">
+                        {ROLES.find((r) => r.value === assignedRole)?.icon} {ROLES.find((r) => r.value === assignedRole)?.label || assignedRole.replace("_", " ")}
+                      </div>
+                    ) : (
+                      <select name="role" value={form.role} onChange={handleChange}
+                        className="w-full pl-10 pr-3 py-2 text-sm border border-gray-200 rounded-lg bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 transition-all appearance-none">
+                        {ROLES.map((r) => <option key={r.value} value={r.value}>{r.icon} {r.label}</option>)}
+                      </select>
+                    )}
                   </div>
                 </div>
                 <div>
