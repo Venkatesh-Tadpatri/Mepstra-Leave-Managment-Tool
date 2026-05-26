@@ -122,6 +122,13 @@ const ROLE_GRADIENTS = {
 const fadeUp = { hidden: { opacity: 0, y: 16 }, show: { opacity: 1, y: 0, transition: { duration: 0.35 } } };
 const stagger = { show: { transition: { staggerChildren: 0.08 } } };
 
+function fmtDate(d) {
+  if (!d) return null;
+  const parts = d.split("T")[0].split("-");
+  if (parts.length !== 3) return d;
+  return `${parts[2]}/${parts[1]}/${parts[0]}`;
+}
+
 export default function ProfilePage() {
   const dispatch = useDispatch();
   const { user } = useSelector((s) => s.auth);
@@ -229,11 +236,11 @@ export default function ProfilePage() {
     { icon: MdEmail,         label: "Email",          value: user?.email, fullWidth: true },
     { icon: MdPhone,         label: "Phone",          value: user?.phone || "Not set" },
     { icon: MdWork,          label: "Department",     value: user?.department?.name || "Not assigned" },
-    { icon: MdCalendarMonth, label: "Joining Date",   value: user?.joining_date || "Not set" },
-    { icon: MdCake,          label: "Date of Birth",  value: user?.date_of_birth || "Not set" },
+    { icon: MdCalendarMonth, label: "Joining Date",   value: fmtDate(user?.joining_date) || "Not set" },
+    { icon: MdCake,          label: "Date of Birth",  value: fmtDate(user?.date_of_birth) || "Not set" },
     { icon: MdWc,            label: "Gender",         value: user?.gender ? user.gender.charAt(0).toUpperCase() + user.gender.slice(1) : "Not set" },
     { icon: MdFavorite,      label: "Marital Status", value: user?.marital_status ? user.marital_status.charAt(0).toUpperCase() + user.marital_status.slice(1) : "Not set" },
-    ...(user?.marital_status === "married" ? [{ icon: MdCalendarMonth, label: "Marriage Date", value: user?.marriage_date || "Not set" }] : []),
+    ...(user?.marital_status === "married" ? [{ icon: MdCalendarMonth, label: "Marriage Date", value: fmtDate(user?.marriage_date) || "Not set" }] : []),
     { icon: MdPerson,        label: "Role",           value: roleLabel },
   ];
 

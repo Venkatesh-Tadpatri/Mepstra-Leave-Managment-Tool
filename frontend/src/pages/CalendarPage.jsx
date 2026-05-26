@@ -32,6 +32,13 @@ function fmtLeaveType(type) {
   return type.charAt(0).toUpperCase() + type.slice(1);
 }
 
+function fmtDate(d) {
+  if (!d) return "—";
+  const parts = d.split("T")[0].split("-");
+  if (parts.length !== 3) return d;
+  return `${parts[2]}/${parts[1]}/${parts[0]}`;
+}
+
 function getLeaveDisplayType(leave) {
   if (!leave) return "";
   if (isWeekendWorkRequest(leave)) return "Weekend Work Request";
@@ -222,8 +229,8 @@ export default function CalendarPage() {
                   <>
                     {[
                       { label: "Employee", value: selected.data.user?.full_name },
-                      { label: "From", value: selected.data.start_date },
-                      { label: "To", value: selected.data.end_date },
+                      { label: "From", value: fmtDate(selected.data.start_date) },
+                      { label: "To", value: fmtDate(selected.data.end_date) },
                       { label: "Days", value: `${selected.data.total_days} day(s)` },
                       { label: "Status", value: selected.data.status, capitalize: true },
                     ].map((row) => (
@@ -248,8 +255,8 @@ export default function CalendarPage() {
                         value: getLeaveDisplayType(selected.data),
                         capitalize: !isWeekendWorkRequest(selected.data),
                       },
-                      { label: "From", value: selected.data.start_date },
-                      { label: "To", value: selected.data.end_date },
+                      { label: "From", value: fmtDate(selected.data.start_date) },
+                      { label: "To", value: fmtDate(selected.data.end_date) },
                       { label: "Days", value: `${selected.data.total_days} day(s)` },
                       { label: "Status", value: selected.data.status.replace(/_/g, " "), capitalize: true },
                     ].map((row) => (
@@ -269,7 +276,7 @@ export default function CalendarPage() {
                   <>
                     {[
                       { label: "Holiday Name", value: selected.data.name },
-                      { label: "Date", value: selected.data.date },
+                      { label: "Date", value: fmtDate(selected.data.date) },
                       { label: "Type", value: selected.data.holiday_type, capitalize: true },
                     ].map((row) => (
                       <div key={row.label} className="flex justify-between items-center py-2 border-b border-gray-50 last:border-0">

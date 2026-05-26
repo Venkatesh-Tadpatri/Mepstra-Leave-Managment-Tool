@@ -29,6 +29,13 @@ import CookieConsent from "../components/common/CookieConsent";
 const fadeUp = { hidden: { opacity: 0, y: 24 }, show: { opacity: 1, y: 0 } };
 const stagger = { show: { transition: { staggerChildren: 0.07 } } };
 
+function fmtDate(d) {
+  if (!d) return "—";
+  const parts = d.split("T")[0].split("-");
+  if (parts.length !== 3) return d;
+  return `${parts[2]}/${parts[1]}/${parts[0]}`;
+}
+
 /* ─── constants ──────────────────────────────────────────── */
 const ROLES = [
   { value: "employee",  label: "Employee",  icon: "👤" },
@@ -197,7 +204,7 @@ export default function RegisterPage() {
     .filter((m) => ["manager", "main_manager"].includes(m.role))
     .filter((m) => form.department_id
       ? m.department && String(m.department.id) === String(form.department_id)
-      : true);
+      : false);
 
   useEffect(() => {
     if (!form.department_id) return;
@@ -766,8 +773,9 @@ export default function RegisterPage() {
                     </div>
                   ) : (
                     <select name="manager_id" value={form.manager_id} onChange={handleChange}
-                      className={`w-full pl-10 pr-3 py-2 text-sm border rounded-lg bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 transition-all appearance-none ${errors.manager_id ? "border-red-400" : "border-gray-200"}`}>
-                      <option value="">Select Manager</option>
+                      disabled={!form.department_id}
+                      className={`w-full pl-10 pr-3 py-2 text-sm border rounded-lg bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 transition-all appearance-none disabled:opacity-60 ${errors.manager_id ? "border-red-400" : "border-gray-200"}`}>
+                      <option value="">{form.department_id ? "Select Manager" : "Select Department First"}</option>
                       {filteredManagers.map((m) => <option key={m.id} value={m.id}>{m.full_name} ({m.role.replace("_", " ")})</option>)}
                     </select>
                   )}
@@ -957,9 +965,9 @@ export default function RegisterPage() {
                     ["Manager",        managers.find((m) => m.id === parseInt(form.manager_id))?.full_name || "Not selected",   "capitalize"],
                     ["Gender",         form.gender || "—",                                                                      "capitalize"],
                     ["Marital Status", form.marital_status || "—",                                                              "capitalize"],
-                    ["Date of Birth",  form.date_of_birth || "—",                                                               "normal-case"],
-                    ["Joining Date",   form.joining_date || "—",                                                                "normal-case"],
-                    ...(form.marital_status === "married" ? [["Marriage Date", form.marriage_date || "—", "normal-case"]] : []),
+                    ["Date of Birth",  fmtDate(form.date_of_birth),                                                             "normal-case"],
+                    ["Joining Date",   fmtDate(form.joining_date),                                                              "normal-case"],
+                    ...(form.marital_status === "married" ? [["Marriage Date", fmtDate(form.marriage_date), "normal-case"]] : []),
                   ].map(([key, val, cls]) => (
                     <div key={key} className="contents">
                       <span className="text-gray-400 font-medium text-xs">{key}</span>

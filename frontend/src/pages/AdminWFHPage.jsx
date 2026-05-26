@@ -14,7 +14,7 @@ const fadeUp = { hidden: { opacity: 0, y: 16 }, show: { opacity: 1, y: 0, transi
 const stagger = { show: { transition: { staggerChildren: 0.06 } } };
 
 function fmtDate(d) {
-  try { return format(parseISO(d), "dd MMM yyyy"); }
+  try { return format(parseISO(d), "dd/MM/yyyy"); }
   catch { return d || "—"; }
 }
 

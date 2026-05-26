@@ -17,7 +17,7 @@ const fadeUp = { hidden: { opacity: 0, y: 16 }, show: { opacity: 1, y: 0, transi
 const stagger = { show: { transition: { staggerChildren: 0.06 } } };
 
 function fmtDate(d) {
-  try { return format(parseISO(d), "dd MMM yyyy"); }
+  try { return format(parseISO(d), "dd/MM/yyyy"); }
   catch { return d || "—"; }
 }
 
@@ -25,7 +25,7 @@ function fmtDateTime(dt) {
   if (!dt) return "—";
   try {
     const safe = dt.endsWith("Z") ? dt : dt + "Z";
-    return format(parseISO(safe), "dd MMM yyyy, hh:mm a");
+    return format(parseISO(safe), "dd/MM/yyyy, hh:mm a");
   } catch { return dt; }
 }
 

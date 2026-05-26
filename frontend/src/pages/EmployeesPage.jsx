@@ -16,6 +16,21 @@ const ROLE_STYLES = {
   admin:        { bg: "bg-gray-100",   text: "text-gray-700",    label: "Admin" },
 };
 
+const MANAGER_ROLE_FILTERS = [
+  { value: "", label: "All" },
+  { value: "employee", label: "Employee" },
+  { value: "team_lead", label: "Team Lead" },
+];
+
+const ADMIN_ROLE_FILTERS = [
+  { value: "", label: "All Roles" },
+  { value: "employee", label: "Employee" },
+  { value: "team_lead", label: "Team Lead" },
+  { value: "manager", label: "Manager" },
+  { value: "hr", label: "HR" },
+  { value: "main_manager", label: "Main Manager" },
+];
+
 const AVATAR_COLORS = [
   "from-blue-500 to-blue-700",
   "from-violet-500 to-purple-700",
@@ -49,6 +64,7 @@ export default function EmployeesPage() {
   const isAdmin = currentUser?.role === "admin";
   const isManager = currentUser?.role === "manager" || currentUser?.role === "team_lead";
   const showBUFilter = !isManager;
+  const roleFilterOptions = isManager ? MANAGER_ROLE_FILTERS : ADMIN_ROLE_FILTERS;
   const canToggleEmployeeOverride = currentUser?.role === "manager";
   const canToggleManagerOverride = ["admin", "main_manager"].includes(currentUser?.role);
   const departmentFromQuery = searchParams.get("department") || "";
@@ -173,7 +189,7 @@ export default function EmployeesPage() {
       <motion.div variants={fadeUp} className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-extrabold text-gray-900">Employees</h1>
-          <p className="text-gray-400 text-sm mt-0.5">{users.length} total employees across all departments</p>
+          <p className="text-gray-400 text-sm mt-0.5">{users.length} total employees across Your department</p>
         </div>
         <div className="flex items-center gap-2 px-4 py-2 bg-blue-50 border border-blue-100 rounded-xl">
           <MdPeople className="text-blue-500" />
@@ -197,16 +213,13 @@ export default function EmployeesPage() {
             <option value="mepstra_engineering_consultancy">MEPstra Engineering Consultancy</option>
           </select>
         )}
-        {!isManager && (
-          <select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)} className="input-field w-40 text-sm">
-            <option value="">All Roles</option>
-            <option value="employee">Employee</option>
-            <option value="team_lead">Team Lead</option>
-            <option value="manager">Manager</option>
-            <option value="hr">HR</option>
-            <option value="main_manager">Main Manager</option>
-          </select>
-        )}
+        <select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)} className="input-field w-40 text-sm">
+          {roleFilterOptions.map((option) => (
+            <option key={option.value || "all"} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
         {!isManager && (
           <select value={deptFilter} onChange={(e) => setDeptFilter(e.target.value)} className="input-field w-44 text-sm">
             <option value="">All Departments</option>
@@ -274,7 +287,7 @@ export default function EmployeesPage() {
                         {/* Override slot — fixed width so Deactivate/Reset PIN always align */}
                         {(canToggleEmployeeOverride || canToggleManagerOverride) && (
                           <div className="w-32 flex-shrink-0">
-                            {((canToggleEmployeeOverride && u.role === "employee") ||
+                            {((canToggleEmployeeOverride && ["employee", "team_lead"].includes(u.role)) ||
                               (canToggleManagerOverride && (u.role === "manager" || u.role === "hr"))) ? (() => {
                               const isOn = overrideUserIds.has(u.id);
                               const busy = overrideLoadingUserId === u.id;

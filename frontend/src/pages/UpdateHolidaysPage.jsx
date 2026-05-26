@@ -27,6 +27,13 @@ function emptyRow() {
   return { date: "", day: "", name: "", holiday_type: "mandatory" };
 }
 
+function fmtDate(d) {
+  if (!d) return "—";
+  const parts = d.split("T")[0].split("-");
+  if (parts.length !== 3) return d;
+  return `${parts[2]}/${parts[1]}/${parts[0]}`;
+}
+
 function getDayFromDate(dateStr) {
   if (!dateStr) return "";
   const d = new Date(dateStr + "T00:00:00");
@@ -349,7 +356,7 @@ export default function UpdateHolidaysPage() {
                                 onChange={(e) => setEditForm((f) => ({ ...f, date: e.target.value }))}
                                 className="w-full px-2 py-1 border border-amber-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-100 bg-white" />
                             ) : (
-                              <span className="text-gray-700 font-semibold">{h.date}</span>
+                              <span className="text-gray-700 font-semibold">{fmtDate(h.date)}</span>
                             )}
                           </td>
 

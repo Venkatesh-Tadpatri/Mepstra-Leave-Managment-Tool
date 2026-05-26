@@ -25,6 +25,13 @@ function fmtLeaveType(type) {
   return type.charAt(0).toUpperCase() + type.slice(1);
 }
 
+function fmtDate(d) {
+  if (!d) return "—";
+  const parts = d.split("T")[0].split("-");
+  if (parts.length !== 3) return d;
+  return `${parts[2]}/${parts[1]}/${parts[0]}`;
+}
+
 function getLeaveTypeLabel(leave) {
   if (leave.leave_type !== "special") return fmtLeaveType(leave.leave_type);
   return (leave.reason || "").toLowerCase().startsWith("weekend work request:")
@@ -71,8 +78,8 @@ function CancelConfirmModal({ leave, onConfirm, onCancel }) {
           <p className="text-sm text-gray-500">
             Are you sure you want to withdraw your{" "}
             <span className="font-semibold text-gray-800">{fmtLeaveType(leave?.leave_type)} Leave</span>{" "}
-            from <span className="font-semibold text-gray-800">{leave?.start_date}</span> to{" "}
-            <span className="font-semibold text-gray-800">{leave?.end_date}</span>?
+            from <span className="font-semibold text-gray-800">{fmtDate(leave?.start_date)}</span> to{" "}
+            <span className="font-semibold text-gray-800">{fmtDate(leave?.end_date)}</span>?
           </p>
         </div>
         <div className="flex gap-3 px-6 py-5">
@@ -636,8 +643,8 @@ export default function DashboardPage() {
                       <td className="px-4 py-3">
                         <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">{fmtLeaveType(e.leave_type)}</span>
                       </td>
-                      <td className="px-4 py-3 text-gray-600">{e.start_date}</td>
-                      <td className="px-4 py-3 text-gray-600">{e.end_date}</td>
+                      <td className="px-4 py-3 text-gray-600">{fmtDate(e.start_date)}</td>
+                      <td className="px-4 py-3 text-gray-600">{fmtDate(e.end_date)}</td>
                       <td className="px-4 py-3 font-bold text-gray-800">{e.total_days}</td>
                     </tr>
                   ))}
@@ -689,8 +696,8 @@ export default function DashboardPage() {
                         </div>
                       </td>
                       <td className="px-4 py-3 text-gray-500">{e.department || "—"}</td>
-                      <td className="px-4 py-3 text-gray-600">{e.start_date}</td>
-                      <td className="px-4 py-3 text-gray-600">{e.end_date}</td>
+                      <td className="px-4 py-3 text-gray-600">{fmtDate(e.start_date)}</td>
+                      <td className="px-4 py-3 text-gray-600">{fmtDate(e.end_date)}</td>
                       <td className="px-4 py-3 font-bold text-gray-800">{e.total_days}</td>
                     </tr>
                   ))}
@@ -801,8 +808,8 @@ export default function DashboardPage() {
                       <td className="px-4 py-3">
                         <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">{fmtLeaveType(e.leave_type)}</span>
                       </td>
-                      <td className="px-4 py-3 text-gray-600">{e.start_date}</td>
-                      <td className="px-4 py-3 text-gray-600">{e.end_date}</td>
+                      <td className="px-4 py-3 text-gray-600">{fmtDate(e.start_date)}</td>
+                      <td className="px-4 py-3 text-gray-600">{fmtDate(e.end_date)}</td>
                       <td className="px-4 py-3 font-bold text-gray-800">{e.total_days}</td>
                       <td className="px-4 py-3">
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700">
@@ -984,8 +991,8 @@ export default function DashboardPage() {
                               {getLeaveTypeLabel(l)}
                             </span>
                           </td>
-                          <td className="px-4 py-3.5 text-gray-700 font-medium">{l.start_date}</td>
-                          <td className="px-4 py-3.5 text-gray-700 font-medium">{l.end_date}</td>
+                          <td className="px-4 py-3.5 text-gray-700 font-medium">{fmtDate(l.start_date)}</td>
+                          <td className="px-4 py-3.5 text-gray-700 font-medium">{fmtDate(l.end_date)}</td>
                           <td className="px-4 py-3.5">
                             <span className="font-bold text-gray-900">{l.total_days}</span>
                             <span className="text-gray-400 text-xs ml-1">day{l.total_days !== 1 ? "s" : ""}</span>

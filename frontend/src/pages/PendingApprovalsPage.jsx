@@ -27,6 +27,13 @@ function fmtLeaveType(type) {
   return type.charAt(0).toUpperCase() + type.slice(1);
 }
 
+function fmtDate(d) {
+  if (!d) return "—";
+  const parts = d.split("T")[0].split("-");
+  if (parts.length !== 3) return d;
+  return `${parts[2]}/${parts[1]}/${parts[0]}`;
+}
+
 function getLeaveTypeLabel(leave) {
   if (leave.leave_type !== "special") return fmtLeaveType(leave.leave_type);
   const isWeekendReq = (leave.reason || "").toLowerCase().startsWith("weekend work request:");
@@ -99,11 +106,11 @@ function ActionModal({ leave, onClose, onAction }) {
             </div>
             <div className="bg-gray-50 rounded-lg p-2">
               <p className="text-xs text-gray-400 mb-0.5">From</p>
-              <p className="font-semibold text-gray-800 text-xs">{leave.start_date}</p>
+              <p className="font-semibold text-gray-800 text-xs">{fmtDate(leave.start_date)}</p>
             </div>
             <div className="bg-gray-50 rounded-lg p-2">
               <p className="text-xs text-gray-400 mb-0.5">To</p>
-              <p className="font-semibold text-gray-800 text-xs">{leave.end_date}</p>
+              <p className="font-semibold text-gray-800 text-xs">{fmtDate(leave.end_date)}</p>
             </div>
           </div>
 
@@ -118,7 +125,7 @@ function ActionModal({ leave, onClose, onAction }) {
             <div className="flex items-start gap-2 p-2.5 bg-amber-50 border border-amber-200 rounded-xl">
               <MdInfoOutline className="text-amber-500 text-base flex-shrink-0 mt-0.5" />
               <p className="text-xs text-amber-700">
-                Can only be approved <strong>on or after {leave.start_date}</strong> — once the employee has actually worked that day.
+                Can only be approved <strong>on or after {fmtDate(leave.start_date)}</strong> — once the employee has actually worked that day.
               </p>
             </div>
           )}
@@ -141,7 +148,7 @@ function ActionModal({ leave, onClose, onAction }) {
           </motion.button>
           <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
             onClick={() => handleAction("approve")} disabled={loading || approveBlocked}
-            title={approveBlocked ? `Can only approve on or after ${leave.start_date}` : ""}
+            title={approveBlocked ? `Can only approve on or after ${fmtDate(leave.start_date)}` : ""}
             className="flex-1 py-2 bg-gradient-to-r from-emerald-500 to-green-600 text-white rounded-xl text-sm font-semibold flex items-center justify-center gap-1.5 shadow-md shadow-green-500/20 disabled:opacity-40 disabled:cursor-not-allowed">
             <MdCheckCircle size={16} /> Approve
           </motion.button>
@@ -214,11 +221,11 @@ function RevokeModal({ leave, onClose, onRevoke }) {
               </div>
               <div className="bg-white rounded-lg p-2.5">
                 <p className="text-xs text-gray-400 mb-0.5">From</p>
-                <p className="font-semibold text-gray-800">{leave.start_date}</p>
+                <p className="font-semibold text-gray-800">{fmtDate(leave.start_date)}</p>
               </div>
               <div className="bg-white rounded-lg p-2.5">
                 <p className="text-xs text-gray-400 mb-0.5">To</p>
-                <p className="font-semibold text-gray-800">{leave.end_date}</p>
+                <p className="font-semibold text-gray-800">{fmtDate(leave.end_date)}</p>
               </div>
             </div>
           </div>
@@ -298,11 +305,11 @@ function WFHActionModal({ wfh, onClose, onAction }) {
               </div>
               <div className="bg-white rounded-lg p-2.5">
                 <p className="text-xs text-gray-400 mb-0.5">From</p>
-                <p className="font-semibold text-gray-800">{wfh.start_date}</p>
+                <p className="font-semibold text-gray-800">{fmtDate(wfh.start_date)}</p>
               </div>
               <div className="bg-white rounded-lg p-2.5">
                 <p className="text-xs text-gray-400 mb-0.5">To</p>
-                <p className="font-semibold text-gray-800">{wfh.end_date}</p>
+                <p className="font-semibold text-gray-800">{fmtDate(wfh.end_date)}</p>
               </div>
             </div>
             <div className="mt-2.5 bg-white rounded-lg p-2.5">
@@ -565,7 +572,7 @@ export default function PendingApprovalsPage() {
                       <div className="flex flex-wrap items-center gap-3 mt-3">
                         <div className="flex items-center gap-1.5 text-xs text-gray-500 bg-gray-50 px-3 py-1.5 rounded-lg">
                           <MdCalendarMonth className="text-gray-400" />
-                          {leave.start_date} → {leave.end_date}
+                          {fmtDate(leave.start_date)} → {fmtDate(leave.end_date)}
                         </div>
                         <div className="text-xs font-bold text-gray-800 bg-gray-50 px-3 py-1.5 rounded-lg">
                           {leave.total_days} day(s)
@@ -583,7 +590,7 @@ export default function PendingApprovalsPage() {
                   </div>
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mt-4 pt-4 border-t border-gray-50">
                     <p className="text-xs text-gray-400">
-                      Applied {format(new Date(leave.created_at), "dd MMM yyyy, hh:mm a")}
+                      Applied {format(new Date(leave.created_at), "dd/MM/yyyy, hh:mm a")}
                     </p>
                     {isEmployee ? (
                       <span className="px-4 py-1.5 bg-amber-50 border border-amber-200 text-amber-700 rounded-xl text-xs font-semibold flex items-center gap-1.5">
@@ -654,7 +661,7 @@ export default function PendingApprovalsPage() {
                     <div className="flex flex-wrap items-center gap-3 mt-3">
                       <div className="flex items-center gap-1.5 text-xs text-gray-500 bg-gray-50 px-3 py-1.5 rounded-lg">
                         <MdCalendarMonth className="text-gray-400" />
-                        {wfh.start_date} → {wfh.end_date}
+                        {fmtDate(wfh.start_date)} → {fmtDate(wfh.end_date)}
                       </div>
                       <div className="text-xs font-bold text-gray-800 bg-gray-50 px-3 py-1.5 rounded-lg">
                         {wfh.total_days} day(s)
@@ -667,7 +674,7 @@ export default function PendingApprovalsPage() {
                 </div>
                 <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-50">
                   <p className="text-xs text-gray-400">
-                    Applied {format(new Date(wfh.created_at), "dd MMM yyyy, hh:mm a")}
+                    Applied {format(new Date(wfh.created_at), "dd/MM/yyyy, hh:mm a")}
                   </p>
                   {isEmployee ? (
                     <span className="px-4 py-1.5 bg-amber-50 border border-amber-200 text-amber-700 rounded-xl text-xs font-semibold flex items-center gap-1.5">
@@ -740,7 +747,7 @@ export default function PendingApprovalsPage() {
                       <div className="flex flex-wrap items-center gap-3 mt-3">
                         <div className="flex items-center gap-1.5 text-xs text-gray-500 bg-gray-50 px-3 py-1.5 rounded-lg">
                           <MdCalendarMonth className="text-gray-400" />
-                          {leave.start_date} → {leave.end_date}
+                          {fmtDate(leave.start_date)} → {fmtDate(leave.end_date)}
                         </div>
                         <div className="text-xs font-bold text-gray-800 bg-gray-50 px-3 py-1.5 rounded-lg">
                           {leave.total_days} day(s)
@@ -759,7 +766,7 @@ export default function PendingApprovalsPage() {
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mt-4 pt-4 border-t border-gray-50">
                     <p className="text-xs text-gray-400">
                       Approved on {leave.manager_action_at
-                        ? format(new Date(leave.manager_action_at), "dd MMM yyyy, hh:mm a")
+                        ? format(new Date(leave.manager_action_at), "dd/MM/yyyy, hh:mm a")
                         : "—"}
                     </p>
                     <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}

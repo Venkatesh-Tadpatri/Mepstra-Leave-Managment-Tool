@@ -37,8 +37,7 @@ const ROLE_LABELS = {
 function fmtDate(d) {
   if (!d) return "—";
   const [y, m, day] = d.split("-");
-  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-  return `${day} ${months[parseInt(m) - 1]} ${y}`;
+  return `${day}/${m}/${y}`;
 }
 
 function generateAndPrint(data) {

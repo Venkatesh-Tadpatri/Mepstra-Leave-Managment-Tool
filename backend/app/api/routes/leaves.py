@@ -318,6 +318,14 @@ def action_leave(leave_id: int, data: LeaveRequestUpdate, background_tasks: Back
                         leave.leave_type.value, leave.start_date, leave.end_date,
                         leave.total_days, "revoked", data.comment or "", leave.reason
                     )
+            else:
+                for hr in db.query(User).filter(User.role == UserRole.HR, User.is_active == True).all():
+                    background_tasks.add_task(
+                        send_leave_status_email,
+                        hr.email, hr.full_name,
+                        leave.leave_type.value, leave.start_date, leave.end_date,
+                        leave.total_days, "revoked", data.comment or "", leave.reason
+                    )
         else:
             if leave.status != LeaveStatus.PENDING:
                 raise HTTPException(400, "Leave is not pending")
@@ -344,6 +352,14 @@ def action_leave(leave_id: int, data: LeaveRequestUpdate, background_tasks: Back
                             leave.leave_type.value, leave.start_date, leave.end_date,
                             leave.total_days, "approved", data.comment or "", leave.reason
                         )
+                else:
+                    for hr in db.query(User).filter(User.role == UserRole.HR, User.is_active == True).all():
+                        background_tasks.add_task(
+                            send_leave_status_email,
+                            hr.email, hr.full_name,
+                            leave.leave_type.value, leave.start_date, leave.end_date,
+                            leave.total_days, "approved", data.comment or "", leave.reason
+                        )
             else:
                 leave.status = LeaveStatus.REJECTED
                 background_tasks.add_task(
@@ -355,6 +371,14 @@ def action_leave(leave_id: int, data: LeaveRequestUpdate, background_tasks: Back
                 if employee.hr_id:
                     hr = db.query(User).filter(User.id == employee.hr_id).first()
                     if hr:
+                        background_tasks.add_task(
+                            send_leave_status_email,
+                            hr.email, hr.full_name,
+                            leave.leave_type.value, leave.start_date, leave.end_date,
+                            leave.total_days, "rejected", data.comment or "", leave.reason
+                        )
+                else:
+                    for hr in db.query(User).filter(User.role == UserRole.HR, User.is_active == True).all():
                         background_tasks.add_task(
                             send_leave_status_email,
                             hr.email, hr.full_name,

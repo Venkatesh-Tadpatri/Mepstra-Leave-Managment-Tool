@@ -65,11 +65,14 @@ def list_users(role: Optional[str] = None, department_id: Optional[int] = None,
 
     # Role-based visibility:
     # - Admin/HR/Main Manager: can see all users
-    # - Manager: only employees assigned to this manager
+    # - Manager: only employees/team leads assigned to this manager
     # - Team Lead: only employees assigned to this team lead
     # - Employee: only self
     if current_user.role == UserRole.MANAGER:
-        q = q.filter(User.role == UserRole.EMPLOYEE, User.manager_id == current_user.id)
+        q = q.filter(
+            User.role.in_([UserRole.EMPLOYEE, UserRole.TEAM_LEAD]),
+            User.manager_id == current_user.id,
+        )
     elif current_user.role == UserRole.TEAM_LEAD:
         q = q.filter(User.department_id == current_user.department_id)
     elif current_user.role == UserRole.EMPLOYEE:
@@ -102,9 +105,9 @@ def get_employee_directory(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """HR only: all active employees grouped by department for the printable directory."""
-    if current_user.role != UserRole.HR:
-        raise HTTPException(403, "HR access only")
+    """HR/Admin only: all active employees grouped by department for the printable directory."""
+    if current_user.role not in (UserRole.HR, UserRole.ADMIN, UserRole.MAIN_MANAGER):
+        raise HTTPException(403, "HR/Admin access only")
 
     today = date.today()
     users = db.query(User).filter(User.is_active == True).order_by(User.full_name).all()
@@ -153,8 +156,8 @@ def get_anniversaries(
     current_user: User = Depends(get_current_user),
 ):
     """HR/Admin only: return all employee birthdays, work anniversaries, marriage anniversaries grouped by month."""
-    if current_user.role != UserRole.HR:
-        raise HTTPException(403, "HR access only")
+    if current_user.role not in (UserRole.HR, UserRole.ADMIN, UserRole.MAIN_MANAGER):
+        raise HTTPException(403, "HR/Admin access only")
 
     today = date.today()
     users = db.query(User).filter(User.is_active == True).all()
@@ -263,7 +266,7 @@ def get_user(user_id: int, db: Session = Depends(get_db),
     if current_user.role == UserRole.EMPLOYEE and user.id != current_user.id:
         raise HTTPException(403, "Not authorized")
     if current_user.role == UserRole.MANAGER:
-        if user.role != UserRole.EMPLOYEE or user.manager_id != current_user.id:
+        if user.role not in [UserRole.EMPLOYEE, UserRole.TEAM_LEAD] or user.manager_id != current_user.id:
             raise HTTPException(403, "Not authorized")
     if current_user.role == UserRole.TEAM_LEAD:
         if user.role != UserRole.EMPLOYEE or user.team_lead_id != current_user.id:
@@ -336,7 +339,7 @@ def get_overrides_today(
     if current_user.role in [UserRole.MANAGER, UserRole.TEAM_LEAD]:
         team_ids = [
             u.id for u in db.query(User).filter(
-                User.role == UserRole.EMPLOYEE,
+                User.role.in_([UserRole.EMPLOYEE, UserRole.TEAM_LEAD]),
                 User.is_active == True,
             ).filter(
                 (User.manager_id == current_user.id) | (User.team_lead_id == current_user.id)
