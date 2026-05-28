@@ -8,7 +8,7 @@ from app.api.deps import get_current_user
 from app.schemas.schemas import LeaveRequestCreate, LeaveRequestResponse, LeaveRequestUpdate, LeaveBalanceResponse
 from app.models.models import LeaveRequest, LeaveBalance, LeaveStatus, LeaveType, User, UserRole, SpecialLeaveCredit
 from app.services.leave_service import create_leave_request, get_or_create_balance, deduct_leave, restore_leave
-from app.services.email_service import send_leave_request_email, send_leave_status_email, send_admin_approved_manager_notification
+from app.services.email_service import send_leave_request_email, send_leave_status_email, send_admin_approved_manager_notification, send_hr_leave_notification_email
 
 router = APIRouter(prefix="/leaves", tags=["Leaves"])
 
@@ -313,16 +313,16 @@ def action_leave(leave_id: int, data: LeaveRequestUpdate, background_tasks: Back
                 hr = db.query(User).filter(User.id == employee.hr_id).first()
                 if hr:
                     background_tasks.add_task(
-                        send_leave_status_email,
-                        hr.email, hr.full_name,
+                        send_hr_leave_notification_email,
+                        hr.email, hr.full_name, employee.full_name,
                         leave.leave_type.value, leave.start_date, leave.end_date,
                         leave.total_days, "revoked", data.comment or "", leave.reason
                     )
             else:
                 for hr in db.query(User).filter(User.role == UserRole.HR, User.is_active == True).all():
                     background_tasks.add_task(
-                        send_leave_status_email,
-                        hr.email, hr.full_name,
+                        send_hr_leave_notification_email,
+                        hr.email, hr.full_name, employee.full_name,
                         leave.leave_type.value, leave.start_date, leave.end_date,
                         leave.total_days, "revoked", data.comment or "", leave.reason
                     )
@@ -347,16 +347,16 @@ def action_leave(leave_id: int, data: LeaveRequestUpdate, background_tasks: Back
                     hr = db.query(User).filter(User.id == employee.hr_id).first()
                     if hr:
                         background_tasks.add_task(
-                            send_leave_status_email,
-                            hr.email, hr.full_name,
+                            send_hr_leave_notification_email,
+                            hr.email, hr.full_name, employee.full_name,
                             leave.leave_type.value, leave.start_date, leave.end_date,
                             leave.total_days, "approved", data.comment or "", leave.reason
                         )
                 else:
                     for hr in db.query(User).filter(User.role == UserRole.HR, User.is_active == True).all():
                         background_tasks.add_task(
-                            send_leave_status_email,
-                            hr.email, hr.full_name,
+                            send_hr_leave_notification_email,
+                            hr.email, hr.full_name, employee.full_name,
                             leave.leave_type.value, leave.start_date, leave.end_date,
                             leave.total_days, "approved", data.comment or "", leave.reason
                         )
@@ -372,16 +372,16 @@ def action_leave(leave_id: int, data: LeaveRequestUpdate, background_tasks: Back
                     hr = db.query(User).filter(User.id == employee.hr_id).first()
                     if hr:
                         background_tasks.add_task(
-                            send_leave_status_email,
-                            hr.email, hr.full_name,
+                            send_hr_leave_notification_email,
+                            hr.email, hr.full_name, employee.full_name,
                             leave.leave_type.value, leave.start_date, leave.end_date,
                             leave.total_days, "rejected", data.comment or "", leave.reason
                         )
                 else:
                     for hr in db.query(User).filter(User.role == UserRole.HR, User.is_active == True).all():
                         background_tasks.add_task(
-                            send_leave_status_email,
-                            hr.email, hr.full_name,
+                            send_hr_leave_notification_email,
+                            hr.email, hr.full_name, employee.full_name,
                             leave.leave_type.value, leave.start_date, leave.end_date,
                             leave.total_days, "rejected", data.comment or "", leave.reason
                         )
@@ -412,8 +412,8 @@ def action_leave(leave_id: int, data: LeaveRequestUpdate, background_tasks: Back
                 hr = db.query(User).filter(User.id == employee.hr_id).first()
                 if hr:
                     background_tasks.add_task(
-                        send_leave_status_email,
-                        hr.email, hr.full_name,
+                        send_hr_leave_notification_email,
+                        hr.email, hr.full_name, employee.full_name,
                         leave.leave_type.value, leave.start_date, leave.end_date,
                         leave.total_days, "revoked", data.comment or "", leave.reason
                     )
@@ -438,8 +438,8 @@ def action_leave(leave_id: int, data: LeaveRequestUpdate, background_tasks: Back
                     hr = db.query(User).filter(User.id == employee.hr_id).first()
                     if hr:
                         background_tasks.add_task(
-                            send_leave_status_email,
-                            hr.email, hr.full_name,
+                            send_hr_leave_notification_email,
+                            hr.email, hr.full_name, employee.full_name,
                             leave.leave_type.value, leave.start_date, leave.end_date,
                             leave.total_days, "approved", data.comment or "", leave.reason
                         )
@@ -447,8 +447,8 @@ def action_leave(leave_id: int, data: LeaveRequestUpdate, background_tasks: Back
                     hr_users = db.query(User).filter(User.role == UserRole.HR, User.is_active == True).all()
                     for hr in hr_users:
                         background_tasks.add_task(
-                            send_leave_status_email,
-                            hr.email, hr.full_name,
+                            send_hr_leave_notification_email,
+                            hr.email, hr.full_name, employee.full_name,
                             leave.leave_type.value, leave.start_date, leave.end_date,
                             leave.total_days, "approved", data.comment or "", leave.reason
                         )
@@ -474,8 +474,8 @@ def action_leave(leave_id: int, data: LeaveRequestUpdate, background_tasks: Back
                     hr = db.query(User).filter(User.id == employee.hr_id).first()
                     if hr:
                         background_tasks.add_task(
-                            send_leave_status_email,
-                            hr.email, hr.full_name,
+                            send_hr_leave_notification_email,
+                            hr.email, hr.full_name, employee.full_name,
                             leave.leave_type.value, leave.start_date, leave.end_date,
                             leave.total_days, "rejected", data.comment or "", leave.reason
                         )

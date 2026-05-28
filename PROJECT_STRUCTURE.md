@@ -16,7 +16,7 @@
 
 ## Top-Level Folder Layout
 
-Mepsrta leave tool/               ← Project root
+mepstra leave tool/               ← Project root
 ├── backend/                      ← Python FastAPI backend
 ├── frontend/                     ← React + Vite frontend
 ├── start-backend.bat             ← Windows script to run backend

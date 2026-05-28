@@ -106,22 +106,31 @@ def _remap_users_to_departments(db, departments: dict[tuple[str, BusinessUnit], 
 
 
 def _seed_users(db, user_data: list, departments: dict[tuple[str, BusinessUnit], Department]) -> dict[str, User]:
-    # First pass: create users without relationships
+    # First pass: create users without relationships (skip if already exists)
     user_objects: dict[str, User] = {}
     for item in user_data:
+        email = item["email"].lower().strip()
+        user = db.query(User).filter(User.email == email).first()
+        if user:
+            # Already exists — never overwrite password, joining_date, or any data
+            user_objects[item["email"]] = user
+            continue
         bu = _BUSINESS_UNIT_MAP[item["business_unit"]]
         dept = departments.get((item["department"], bu))
-        defaults = {
-            "full_name": item["full_name"],
-            "hashed_password": get_password_hash(item["password"]),
-            "role": _ROLE_MAP[item["role"]],
-            "employment_type": _EMPLOYMENT_MAP[item["employment_type"]],
-            "business_unit": bu,
-            "department_id": dept.id if dept else None,
-            "joining_date": date.fromisoformat(item["joining_date"]),
-            "is_active": True,
-        }
-        user = _get_or_create_user(db, item["email"], defaults)
+        user = User(
+            email=email,
+            full_name=item["full_name"],
+            hashed_password=get_password_hash(item["password"]),
+            role=_ROLE_MAP[item["role"]],
+            employment_type=_EMPLOYMENT_MAP[item["employment_type"]],
+            business_unit=bu,
+            department_id=dept.id if dept else None,
+            joining_date=date.fromisoformat(item["joining_date"]),
+            is_active=True,
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
         user_objects[item["email"]] = user
 
     # Second pass: wire up manager/hr references

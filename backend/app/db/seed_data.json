@@ -54,7 +54,7 @@
 
   "users": [
     {
-      "email": "admin@mepstra.com",
+      "email": "admin@mepsrta.com",
       "full_name": "Deepak Dixith",
       "password": "1234",
       "role": "ADMIN",
