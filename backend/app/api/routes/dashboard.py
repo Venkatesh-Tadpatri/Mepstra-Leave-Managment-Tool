@@ -33,8 +33,19 @@ def get_stats(
 
     if is_manager_view:
         total_employees = len(managed_user_ids)
-        pq = (db.query(LeaveRequest).join(User, LeaveRequest.user_id == User.id)
-              .filter(User.manager_id == current_user.id, LeaveRequest.status == LeaveStatus.PENDING))
+        if current_user.role == UserRole.TEAM_LEAD:
+            employee_only_ids = [u.id for u in db.query(User).filter(
+                User.department_id == current_user.department_id,
+                User.is_active == True,
+                User.role.in_([UserRole.EMPLOYEE, UserRole.TEAM_LEAD])
+            ).all()]
+            pq = db.query(LeaveRequest).filter(
+                LeaveRequest.user_id.in_(employee_only_ids),
+                LeaveRequest.status == LeaveStatus.PENDING
+            )
+        else:
+            pq = (db.query(LeaveRequest).join(User, LeaveRequest.user_id == User.id)
+                  .filter(User.manager_id == current_user.id, LeaveRequest.status == LeaveStatus.PENDING))
         if business_unit:
             pq = pq.filter(User.business_unit == business_unit)
         pending_requests = pq.count()

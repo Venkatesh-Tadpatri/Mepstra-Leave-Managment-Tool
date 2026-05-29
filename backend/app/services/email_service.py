@@ -87,7 +87,7 @@ def send_leave_request_email(employee_name: str, leave_type: str, start_date, en
         <tr><td style="padding:10px;border:1px solid #e5e7eb"><strong>Total Days</strong></td><td style="padding:10px;border:1px solid #e5e7eb">{total_days} day(s)</td></tr>
         <tr style="background:#f9fafb"><td style="padding:10px;border:1px solid #e5e7eb"><strong>Reason</strong></td><td style="padding:10px;border:1px solid #e5e7eb">{reason}</td></tr>
       </table>
-      <p>Please login to the <strong>Mepstra Leave Portal</strong> to approve or reject this request.</p>
+      <p>Please login to the <a href="https://mepstratechnologies.com/Mepstra-Eleave/" style="color:#1a56db;font-weight:bold;text-decoration:underline" target="_blank">Mepstra Leave Portal</a> to approve or reject this request.</p>
       <p style="color:#6b7280;font-size:12px">This is an automated notification from {settings.COMPANY_NAME}.</p>
     </div></body></html>
     """
@@ -217,7 +217,7 @@ def send_wfh_request_email(employee_name: str, start_date, end_date, total_days:
         <tr style="background:#f9fafb"><td style="padding:10px;border:1px solid #e5e7eb"><strong>Total Days</strong></td><td style="padding:10px;border:1px solid #e5e7eb">{total_days} day(s)</td></tr>
         <tr><td style="padding:10px;border:1px solid #e5e7eb"><strong>Reason</strong></td><td style="padding:10px;border:1px solid #e5e7eb">{reason}</td></tr>
       </table>
-      <p>Please login to the <strong>Mepstra Leave Portal</strong> to approve or reject this request.</p>
+      <p>Please login to the <a href="https://mepstratechnologies.com/Mepstra-Eleave/" style="color:#1a56db;font-weight:bold;text-decoration:underline" target="_blank">Mepstra Leave Portal</a> to approve or reject this request.</p>
       <p style="color:#6b7280;font-size:12px">This is an automated notification from {settings.COMPANY_NAME}.</p>
     </div></body></html>
     """

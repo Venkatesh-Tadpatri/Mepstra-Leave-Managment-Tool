@@ -349,7 +349,8 @@ export default function PendingApprovalsPage() {
   const { pending, loading } = useSelector((s) => s.leaves);
   const { user } = useSelector((s) => s.auth);
   const isHR = user?.role === "hr";
-  const isEmployee = ["employee", "team_lead"].includes(user?.role);
+  const isTeamLead = user?.role === "team_lead";
+  const isEmployee = user?.role === "employee";
   const canRevoke = ["manager", "main_manager", "admin"].includes(user?.role);
 
   const [selected, setSelected] = useState(null);
@@ -458,12 +459,12 @@ export default function PendingApprovalsPage() {
       <motion.div variants={fadeUp} className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-extrabold text-gray-900">
-            {isEmployee ? "My Pending Requests" : isHR ? "Leave Requests" : "Pending Approvals"}
+            {isEmployee ? "My Pending Requests" : (isHR || isTeamLead) ? "Leave Requests" : "Pending Approvals"}
           </h1>
           <p className="text-gray-400 text-sm mt-0.5">
             {isEmployee
               ? "Leave and WFH requests awaiting approval"
-              : isHR
+              : (isHR || isTeamLead)
               ? "View all leave requests (read-only access)"
               : "Review and action leave requests"}
           </p>
@@ -596,7 +597,7 @@ export default function PendingApprovalsPage() {
                       <span className="px-4 py-1.5 bg-amber-50 border border-amber-200 text-amber-700 rounded-xl text-xs font-semibold flex items-center gap-1.5">
                         <MdHourglassTop className="text-amber-500" /> Awaiting Approval
                       </span>
-                    ) : isHR ? (
+                    ) : (isHR || isTeamLead) ? (
                       <span className="px-4 py-1.5 bg-gray-100 text-gray-500 rounded-xl text-xs font-semibold">
                         View Only
                       </span>
@@ -680,7 +681,7 @@ export default function PendingApprovalsPage() {
                     <span className="px-4 py-1.5 bg-amber-50 border border-amber-200 text-amber-700 rounded-xl text-xs font-semibold flex items-center gap-1.5">
                       <MdHourglassTop className="text-amber-500" /> Awaiting Approval
                     </span>
-                  ) : isHR ? (
+                  ) : (isHR || isTeamLead) ? (
                     <span className="px-4 py-1.5 bg-gray-100 text-gray-500 rounded-xl text-xs font-semibold">
                       View Only
                     </span>

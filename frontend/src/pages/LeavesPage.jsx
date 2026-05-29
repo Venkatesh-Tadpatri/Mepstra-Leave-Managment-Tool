@@ -290,7 +290,7 @@ export default function LeavesPage() {
                         <span className="font-bold text-gray-900">{l.total_days}</span>
                         <span className="text-gray-400 text-xs ml-1">day{l.total_days !== 1 ? "s" : ""}</span>
                       </td>
-                      <td className="px-4 py-3.5 text-gray-500 max-w-[180px] truncate">{l.reason}</td>
+                      <td className="px-4 py-3.5 text-gray-500 max-w-[180px] truncate cursor-help" title={l.reason || ""}>{l.reason}</td>
                       <td className="px-4 py-3.5">
                         <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${sc.bg} ${sc.text}`}>
                           <span className="w-1.5 h-1.5 rounded-full" style={{ background: sc.dot }} />

@@ -160,8 +160,12 @@ def wfh_today(
             WorkFromHomeRequest.status == WFHStatus.APPROVED,
         )
     )
-    if current_user.role in [UserRole.MANAGER, UserRole.TEAM_LEAD]:
+    if current_user.role == UserRole.MANAGER:
         q = q.filter(WorkFromHomeRequest.manager_id == current_user.id)
+    elif current_user.role == UserRole.TEAM_LEAD:
+        dept_user_ids = [u.id for u in db.query(User).filter(
+            User.department_id == current_user.department_id, User.is_active == True).all()]
+        q = q.filter(WorkFromHomeRequest.user_id.in_(dept_user_ids))
 
     reqs = q.all()
     return [
@@ -272,7 +276,10 @@ def wfh_report(
         q = q.filter(WorkFromHomeRequest.user_id.in_(assigned_ids))
     elif current_user.role == UserRole.TEAM_LEAD:
         dept_ids = [u.id for u in db.query(User).filter(
-            User.department_id == current_user.department_id, User.is_active == True).all()]
+            User.department_id == current_user.department_id,
+            User.is_active == True,
+            User.role.in_([UserRole.EMPLOYEE, UserRole.TEAM_LEAD])
+        ).all()]
         q = q.filter(WorkFromHomeRequest.user_id.in_(dept_ids))
 
     reqs = q.order_by(WorkFromHomeRequest.start_date.asc()).all()

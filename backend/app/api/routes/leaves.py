@@ -123,9 +123,21 @@ def get_leaves(
 @router.get("/pending", response_model=List[LeaveRequestResponse])
 def get_pending_approvals(db: Session = Depends(get_db),
                           current_user: User = Depends(get_current_user)):
-    if current_user.role in [UserRole.MANAGER, UserRole.TEAM_LEAD]:
-        # Show all PENDING leaves where the employee's assigned manager is current user
-        # (regardless of leave routing — admin may have been auto-assigned as approver)
+    if current_user.role == UserRole.TEAM_LEAD:
+        dept_ids = [u.id for u in db.query(User).filter(
+            User.department_id == current_user.department_id,
+            User.is_active == True,
+            User.role.in_([UserRole.EMPLOYEE, UserRole.TEAM_LEAD])
+        ).all()]
+        return (
+            db.query(LeaveRequest)
+            .filter(
+                LeaveRequest.user_id.in_(dept_ids),
+                LeaveRequest.status == LeaveStatus.PENDING
+            )
+            .all()
+        )
+    if current_user.role == UserRole.MANAGER:
         return (
             db.query(LeaveRequest)
             .join(User, LeaveRequest.user_id == User.id)
@@ -216,7 +228,10 @@ def leave_report(
         q = q.filter(LeaveRequest.user_id.in_(assigned_ids))
     elif current_user.role == UserRole.TEAM_LEAD:
         dept_ids = [u.id for u in db.query(User).filter(
-            User.department_id == current_user.department_id, User.is_active == True).all()]
+            User.department_id == current_user.department_id,
+            User.is_active == True,
+            User.role.in_([UserRole.EMPLOYEE, UserRole.TEAM_LEAD])
+        ).all()]
         q = q.filter(LeaveRequest.user_id.in_(dept_ids))
 
     reqs = q.order_by(LeaveRequest.start_date.asc()).all()
@@ -277,9 +292,11 @@ def get_leave(leave_id: int, db: Session = Depends(get_db),
 def action_leave(leave_id: int, data: LeaveRequestUpdate, background_tasks: BackgroundTasks,
                  db: Session = Depends(get_db),
                  current_user: User = Depends(get_current_user)):
-    # HR role is view-only — cannot approve/reject
+    # HR and Team Lead are view-only — cannot approve/reject
     if current_user.role == UserRole.HR:
         raise HTTPException(403, "HR has view-only access to leave records")
+    if current_user.role == UserRole.TEAM_LEAD:
+        raise HTTPException(403, "Team leads have view-only access to leave records")
 
     leave = db.query(LeaveRequest).filter(LeaveRequest.id == leave_id).first()
     if not leave:
